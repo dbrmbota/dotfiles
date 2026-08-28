@@ -1,0 +1,111 @@
+
+# =============================================================================
+# .zshrc
+# =============================================================================
+
+# --- Setup config location ---
+export XDG_CONFIG_HOME="$HOME/.config"
+
+# --- Brew setup (must come early so brew-installed tools are in PATH) --------
+eval "$(/opt/homebrew/bin/brew shellenv)"
+
+# --- Zsh plugins (replaces ble.sh) ------------------------------------------
+# Install these first:
+#   brew install zsh-autosuggestions zsh-syntax-highlighting
+source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
+source $(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+
+# --- Autosuggestion config (ble.sh equivalent settings) ----------------------
+ZSH_AUTOSUGGEST_STRATEGY=(history completion)
+ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
+
+# --- Ghostty shell integration -----------------------------------------------
+# Note: y auto-injects shell integration for zsh, so this block is
+# optional. Only needed if you disabled auto-injection with:
+#   shell-integration = none
+# in your Ghostty config. If auto-injection is on, you can remove this.
+if [ -n "${GHOSTTY_RESOURCES_DIR}" ]; then
+  builtin source "${GHOSTTY_RESOURCES_DIR}/shell-integration/zsh/ghostty.zsh" 2>/dev/null
+fi
+
+# --- fnm setup ---------------------------------------------------------------
+eval "$(fnm env --use-on-cd --shell zsh)"
+
+# --- Oh My Posh setup --------------------------------------------------------
+eval "$(oh-my-posh init zsh --config $(brew --prefix oh-my-posh)/themes/tokyo.omp.json)"
+
+# --- AWS credentials ---------------------------------------------------------
+export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
+export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
+
+# --- PATH --------------------------------------------------------------------
+export PATH="$PATH:/usr/local/bin"
+export PATH="/Users/dbrmbota/.local/bin:$PATH"
+export PATH="$PATH:$HOME/.dotnet/tools"
+export PATH="$PATH:$HOME/.dotnet"
+export PATH="$HOME/.emacs.d/bin:$PATH"
+export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
+export PATH="$HOME/go/bin/:$PATH"
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
+
+# --- EDITOR ------------------------------------------------------------------
+export EDITOR=nvim
+
+# --- DOTNET ------------------------------------------------------------------
+export DOTNET_ROOT="$HOME/.dotnet"
+export DOTNET_ROOT_ARM64="$HOME/.dotnet"
+
+# --- Aliases -----------------------------------------------------------------
+alias timeout="gtimeout"
+alias hs-devubu01="open -na Ghostty --args --clipboard-read=allow -e ssh hs-devubu01"
+
+# --- Completion system -------------------------------------------------------
+# Initialize zsh's built-in completion (replaces bash_completion.sh)
+autoload -Uz compinit && compinit
+autoload -U +X bashcompinit && bashcompinit
+
+# fnm
+eval "$(fnm completions --shell zsh)"
+
+# Terraform
+complete -o nospace -C /opt/homebrew/bin/terraform terraform
+
+# Scaleway
+eval "$(scw autocomplete script shell=zsh)"
+
+# dotnet
+eval "$(dotnet completions script zsh)"
+
+# ngrok
+eval "$(ngrok completion)"
+
+# --- Completion tweaks -------------------------------------------------------
+# Case-insensitive completion (like bash with completion-ignore-case)
+zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
+
+# Completion menu with selection (navigate with arrows)
+zstyle ':completion:*' menu select
+
+# --- History -----------------------------------------------------------------
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY          # share history across terminals
+setopt HIST_IGNORE_ALL_DUPS   # no duplicate entries
+setopt HIST_IGNORE_SPACE      # don't record commands starting with space
+setopt APPEND_HISTORY         # append instead of overwrite
+
+# --- Key bindings ------------------------------------------------------------
+# Use emacs-style keybindings (same as default bash)
+# Change to `bindkey -v` if you want vi mode
+bindkey -e
+
+# Make Home/End/Delete work properly
+bindkey '^[[H'  beginning-of-line    # Home
+bindkey '^[[F'  end-of-line          # End
+bindkey '^[[3~' delete-char          # Delete
+
+# HS-RS GRC project
+export TELERIK_NUGET_KEY="{{ (awsSecretsManager "hsrs/telerik-nuget-key").key }}"
+

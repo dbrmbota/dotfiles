@@ -1,0 +1,66 @@
+:: default : /opt/homebrew/bin/sketchybar --set wm_mode drawing=off
+:: wm @ : /opt/homebrew/bin/sketchybar --set wm_mode drawing=on
+
+cmd - escape ; wm
+wm < cmd - escape ; default
+wm < escape ; default
+
+# Focus / move
+wm < h : komorebic focus left
+wm < j : komorebic focus down
+wm < k : komorebic focus up
+wm < l : komorebic focus right
+wm < shift - h : komorebic move left
+wm < shift - j : komorebic move down
+wm < shift - k : komorebic move up
+wm < shift - l : komorebic move right
+wm < shift - 0x21 : komorebic cycle-focus previous # [
+wm < shift - 0x1E : komorebic cycle-focus next # ]
+wm < return : komorebic promote
+
+# Stack
+wm < left : komorebic stack left
+wm < down : komorebic stack down
+wm < up : komorebic stack up
+wm < right : komorebic stack right
+wm < 0x29 : komorebic unstack # ;
+wm < 0x21 : komorebic cycle-stack previous # [
+wm < 0x1E : komorebic cycle-stack next # ]
+wm < shift - 0x29 : komorebic toggle-workspace-layer # ;
+
+# Resize
+wm < 0x1B : komorebic resize-axis horizontal decrease # -
+wm < 0x18 : komorebic resize-axis horizontal increase # =
+wm < shift - 0x1B : komorebic resize-axis vertical decrease # -
+wm < shift - 0x18 : komorebic resize-axis vertical increase # =
+
+# Window / layout
+wm < t : komorebic toggle-float
+wm < shift - t : komorebic toggle-workspace-float-override
+wm < f : komorebic toggle-monocle
+wm < r : komorebic retile
+wm < p : komorebic toggle-pause
+wm < 0 : komorebic toggle-window-container-behaviour
+wm < x : komorebic flip-layout horizontal
+wm < y : komorebic flip-layout vertical
+wm < n : komorebic cycle-layout next
+wm < shift - n : komorebic cycle-layout previous
+wm < shift - x : komorebic session-float-rule
+
+# Workspaces
+wm < 1 : komorebic focus-workspace 0
+wm < 2 : komorebic focus-workspace 1
+wm < 3 : komorebic focus-workspace 2
+wm < 4 : komorebic focus-workspace 3
+wm < 5 : komorebic focus-workspace 4
+wm < 6 : komorebic focus-workspace 5
+wm < 7 : komorebic focus-workspace 6
+wm < 8 : komorebic focus-workspace 7
+wm < shift - 1 : komorebic move-to-workspace 0
+wm < shift - 2 : komorebic move-to-workspace 1
+wm < shift - 3 : komorebic move-to-workspace 2
+wm < shift - 4 : komorebic move-to-workspace 3
+wm < shift - 5 : komorebic move-to-workspace 4
+wm < shift - 6 : komorebic move-to-workspace 5
+wm < shift - 7 : komorebic move-to-workspace 6
+wm < shift - 8 : komorebic move-to-workspace 7
