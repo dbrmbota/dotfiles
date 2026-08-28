@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+
+PLUGIN_DIR="$HOME/.config/sketchybar/plugins"
+
+BLACK=0xff181819
+WHITE=0xffe2e2e3
+RED=0xfffc5d7c
+GREEN=0xff9ed072
+BLUE=0xff76cce0
+YELLOW=0xffe7c664
+ORANGE=0xfff39660
+GREY=0xff7f8490
+TRANSPARENT=0x00000000
+BAR_BG=0xdd1f2335
+POPUP_BG=0xc01f2335
+CHIP_BG=0xcc3b4261
+CHIP_BORDER=0xff565f89
+INNER_BG=0xff565f89
+BG1=$CHIP_BG
+BG2=0xff414868
+
+FONT="Hack Nerd Font"
+APP_FONT="sketchybar-app-font"
+
+##### Bar: floating rounded strip (README look) #####
+sketchybar --bar \
+  position=top \
+  height=40 \
+  color=$BAR_BG \
+  border_color=$BG2 \
+  border_width=0 \
+  corner_radius=10 \
+  margin=14 \
+  y_offset=6 \
+  blur_radius=0 \
+  shadow=on \
+  padding_left=8 \
+  padding_right=8 \
+  notch_width=0
+
+##### Defaults #####
+sketchybar --default \
+  icon.font="$FONT:Bold:14.0" \
+  label.font="$FONT:Bold:13.0" \
+  icon.color=$WHITE \
+  label.color=$WHITE \
+  icon.padding_left=4 \
+  icon.padding_right=4 \
+  label.padding_left=4 \
+  label.padding_right=4 \
+  background.height=26 \
+  background.corner_radius=8 \
+  background.border_width=0 \
+  padding_left=4 \
+  padding_right=4 \
+  popup.background.color=$POPUP_BG \
+  popup.background.corner_radius=9 \
+  popup.background.border_width=2 \
+  popup.background.border_color=$GREY \
+  popup.blur_radius=50
+
+##### Left: apple + spaces + chevron + front app #####
+
+# Apple (green) with popup
+sketchybar --add item apple left \
+  --set apple \
+    icon="" \
+    icon.font="$FONT:Bold:20.0" \
+    icon.color=$GREEN \
+    icon.padding_left=8 \
+    icon.padding_right=8 \
+    label.drawing=off \
+    background.drawing=off \
+    padding_left=0 \
+    padding_right=2 \
+    popup.align=left \
+    click_script="sketchybar --set apple popup.drawing=toggle"
+
+sketchybar --add item apple.prefs popup.apple \
+  --set apple.prefs \
+    icon="" \
+    icon.color=$WHITE \
+    icon.padding_left=10 \
+    label="Preferences" \
+    label.padding_right=12 \
+    click_script="open -a 'System Settings'; sketchybar --set apple popup.drawing=off"
+
+sketchybar --add item apple.activity popup.apple \
+  --set apple.activity \
+    icon="" \
+    icon.color=$WHITE \
+    icon.padding_left=10 \
+    label="Activity" \
+    label.padding_right=12 \
+    click_script="open -a 'Activity Monitor'; sketchybar --set apple popup.drawing=off"
+
+sketchybar --add item apple.lock popup.apple \
+  --set apple.lock \
+    icon="" \
+    icon.color=$WHITE \
+    icon.padding_left=10 \
+    label="Lock Screen" \
+    label.padding_right=12 \
+    click_script="osascript -e 'tell application \"System Events\" to keystroke \"q\" using {control down, command down}'; sketchybar --set apple popup.drawing=off"
+
+# Workspace indicators 1-8 (komorebi).
+# Outer pill = bracket around all spaces; inner pill = label.background around app icons.
+for i in $(seq 1 8); do
+  idx=$((i - 1))
+  pl=1
+  pr=1
+  [ "$i" -eq 1 ] && pl=8
+  [ "$i" -eq 8 ] && pr=8
+  sketchybar --add item "space.$i" left \
+    --set "space.$i" \
+      icon="$i" \
+      icon.font="$FONT:Bold:14.0" \
+      icon.color=$WHITE \
+      icon.highlight_color=$RED \
+      icon.padding_left=8 \
+      icon.padding_right=6 \
+      label="" \
+      label.font="$APP_FONT:Regular:16.0" \
+      label.color=$WHITE \
+      label.highlight_color=$WHITE \
+      label.padding_left=0 \
+      label.padding_right=0 \
+      label.width=0 \
+      label.align=left \
+      label.y_offset=0 \
+      label.background.drawing=off \
+      label.background.color=$INNER_BG \
+      label.background.corner_radius=8 \
+      label.background.height=28 \
+      label.background.border_width=0 \
+      background.drawing=off \
+      background.height=28 \
+      padding_left=$pl \
+      padding_right=$pr \
+      drawing=on \
+      click_script="python3 \"$PLUGIN_DIR/komorebi_events.py\" --select $idx; komorebic focus-workspace $idx"
+done
+
+sketchybar --add bracket spaces \
+  space.1 space.2 space.3 space.4 space.5 space.6 space.7 space.8 \
+  --set spaces \
+    background.color=$CHIP_BG \
+    background.corner_radius=8 \
+    background.height=28 \
+    background.border_width=1 \
+    background.border_color=$CHIP_BORDER
+
+sketchybar --add item ws_layout left \
+  --set ws_layout \
+    icon.drawing=off \
+    label="—" \
+    label.font="$FONT:Bold:12.0" \
+    label.color=$WHITE \
+    label.padding_left=10 \
+    label.padding_right=10 \
+    background.color=$CHIP_BG \
+    background.corner_radius=8 \
+    background.height=28 \
+    background.border_width=1 \
+    background.border_color=$CHIP_BORDER \
+    padding_left=8 \
+    padding_right=2 \
+    drawing=on
+
+# Chevron separator
+sketchybar --add item chevron left \
+  --set chevron \
+    icon="" \
+    icon.font="$FONT:Bold:16.0" \
+    icon.color=$GREY \
+    icon.padding_left=6 \
+    icon.padding_right=6 \
+    label.drawing=off \
+    background.drawing=off \
+    padding_left=10 \
+    padding_right=2
+
+# Front app (icon via sketchybar-app-font)
+sketchybar --add item front_app left \
+  --set front_app \
+    icon.font="$APP_FONT:Regular:16.0" \
+    icon.color=$WHITE \
+    icon.padding_right=6 \
+    label.font="$FONT:Bold:13.0" \
+    label.color=$WHITE \
+    background.drawing=off \
+    script="$PLUGIN_DIR/front_app.sh" \
+    --subscribe front_app front_app_switched
+
+sketchybar --add item wm_mode left \
+  --set wm_mode \
+    drawing=off \
+    icon="WM" \
+    icon.font="$FONT:Bold:12.0" \
+    icon.color=$RED \
+    icon.padding_left=8 \
+    icon.padding_right=8 \
+    label.drawing=off \
+    background.color=$CHIP_BG \
+    background.corner_radius=8 \
+    background.height=28 \
+    background.border_width=1 \
+    background.border_color=$RED \
+    padding_left=8 \
+    padding_right=2
+
+##### Right: cpu graph, wifi+volume+battery, calendar #####
+
+# Calendar (rightmost)
+sketchybar --add item calendar right \
+  --set calendar \
+    icon.font="$FONT:Bold:12.0" \
+    icon.color=$WHITE \
+    icon.padding_left=10 \
+    label.font="$FONT:Regular:12.0" \
+    label.color=$WHITE \
+    label.padding_right=10 \
+    background.drawing=off \
+    padding_left=4 \
+    padding_right=0 \
+    update_freq=30 \
+    script="$PLUGIN_DIR/calendar.sh" \
+    --subscribe calendar system_woke
+
+# Battery / volume / wifi grouped into one pill
+sketchybar --add item battery right \
+  --set battery \
+    icon.font="$FONT:Bold:16.0" \
+    label.font="$FONT:Bold:12.0" \
+    background.drawing=off \
+    padding_left=2 \
+    padding_right=8 \
+    update_freq=120 \
+    script="$PLUGIN_DIR/battery.sh" \
+    --subscribe battery power_source_change system_woke
+
+sketchybar --add item volume right \
+  --set volume \
+    icon.font="$FONT:Bold:14.0" \
+    icon.color=$GREY \
+    label.font="$FONT:Bold:12.0" \
+    background.drawing=off \
+    padding_left=2 \
+    padding_right=2 \
+    script="$PLUGIN_DIR/volume.sh" \
+    --subscribe volume volume_change
+
+sketchybar --add item wifi right \
+  --set wifi \
+    icon.font="$FONT:Bold:14.0" \
+    label.drawing=off \
+    background.drawing=off \
+    padding_left=8 \
+    padding_right=2 \
+    script="$PLUGIN_DIR/wifi.sh" \
+    --subscribe wifi wifi_change system_woke
+
+sketchybar --add bracket status wifi volume battery \
+  --set status \
+    background.color=$BG1 \
+    background.corner_radius=8 \
+    background.height=26 \
+    background.border_width=1 \
+    background.border_color=$CHIP_BORDER
+
+# CPU graph
+sketchybar --add graph cpu right 42 \
+  --set cpu \
+    graph.color=$BLUE \
+    icon.drawing=off \
+    label="cpu 0%" \
+    label.font="$FONT:Bold:9.0" \
+    label.color=$WHITE \
+    label.y_offset=4 \
+    label.padding_right=4 \
+    background.drawing=off \
+    padding_left=4 \
+    padding_right=4 \
+    update_freq=3 \
+    script="$PLUGIN_DIR/cpu.sh"
+
+# Event-driven komorebi updates; slow poll is only a fallback
+sketchybar --add item komorebi_observer left \
+  --set komorebi_observer drawing=off update_freq=15 script="$PLUGIN_DIR/komorebi.sh"
+
+rm -f /tmp/sketchybar-komorebi.json
+nohup python3 "$PLUGIN_DIR/komorebi_events.py" >/tmp/komorebi_events.log 2>&1 &
+
+sketchybar --update
