@@ -1,0 +1,30 @@
+theme = "tokyo-night-storm"
+diff_view = "side-by-side"
+comment_vim = true
+
+[[comment_types]]
+id = "major"
+color = "red"
+definition = "must fix, critical issue"
+
+[[comment_types]]
+id = "minor"
+color = "yellow"
+definition = "should fix, not a critical issue"
+
+[[comment_types]]
+id = "suggestion"
+color = "magenta"
+definition = "improvement suggestion or personal preference"
+
+[[comment_types]]
+id = "question"
+color = "blue"
+definition = "a question requiring the committer to clarify or respond"
+
+[[comment_types]]
+id = "resolved"
+color = "green"
+definition = "thread is resolved and can be ignored"
+
+
