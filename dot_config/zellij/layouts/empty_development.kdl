@@ -1,0 +1,33 @@
+layout {
+    default_tab_template {
+        pane size=1 borderless=true {
+            plugin location="zellij:tab-bar"
+        }
+        children
+        pane size=1 borderless=true {
+            plugin location="zellij:status-bar"
+        }
+    }
+
+    tab name="Editor" {
+        pane command="nvim"
+    }
+    tab {
+        pane command="opencode" {
+            args "--port"
+        }
+    }
+    tab name="Source Control" {
+        pane command="lazygit"
+    }
+
+    swap_floating_layout {
+        floating_panes max_panes=1 {
+            pane x="10%" y="10%" width="80%" height="80%"
+        }
+        floating_panes max_panes=2 {
+            pane x=0 width="50%" height="80%"
+            pane x="50%" width="50%" height="80%"
+        }
+    }
+}
