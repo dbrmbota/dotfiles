@@ -20,12 +20,10 @@ ZSH_AUTOSUGGEST_STRATEGY=(history completion)
 ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=20
 
 # --- Ghostty shell integration -----------------------------------------------
-# Note: y auto-injects shell integration for zsh, so this block is
-# optional. Only needed if you disabled auto-injection with:
-#   shell-integration = none
-# in your Ghostty config. If auto-injection is on, you can remove this.
+# Ghostty adds automatic shell integration, but we add this to ensure
+# that it works in all cases
 if [ -n "${GHOSTTY_RESOURCES_DIR}" ]; then
-  builtin source "${GHOSTTY_RESOURCES_DIR}/shell-integration/zsh/ghostty.zsh" 2>/dev/null
+  builtin source "$GHOSTTY_RESOURCES_DIR"/shell-integration/zsh/ghostty-integration
 fi
 
 # --- fnm setup ---------------------------------------------------------------
@@ -33,10 +31,6 @@ eval "$(fnm env --use-on-cd --shell zsh)"
 
 # --- Oh My Posh setup --------------------------------------------------------
 eval "$(oh-my-posh init zsh --config $(brew --prefix oh-my-posh)/themes/tokyo.omp.json)"
-
-# --- AWS credentials ---------------------------------------------------------
-export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
-export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
 
 # --- PATH --------------------------------------------------------------------
 export PATH="$PATH:/usr/local/bin"
@@ -55,10 +49,6 @@ export EDITOR=nvim
 # --- DOTNET ------------------------------------------------------------------
 export DOTNET_ROOT="$HOME/.dotnet"
 export DOTNET_ROOT_ARM64="$HOME/.dotnet"
-
-# --- Aliases -----------------------------------------------------------------
-alias timeout="gtimeout"
-alias hs-devubu01="open -na Ghostty --args --clipboard-read=allow -e ssh hs-devubu01"
 
 # --- Completion system -------------------------------------------------------
 # Initialize zsh's built-in completion (replaces bash_completion.sh)
