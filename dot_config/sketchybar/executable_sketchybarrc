@@ -192,23 +192,6 @@ sketchybar --add item front_app left \
     script="$PLUGIN_DIR/front_app.sh" \
     --subscribe front_app front_app_switched
 
-sketchybar --add item wm_mode left \
-  --set wm_mode \
-    drawing=off \
-    icon="WM" \
-    icon.font="$FONT:Bold:12.0" \
-    icon.color=$RED \
-    icon.padding_left=8 \
-    icon.padding_right=8 \
-    label.drawing=off \
-    background.color=$CHIP_BG \
-    background.corner_radius=8 \
-    background.height=28 \
-    background.border_width=1 \
-    background.border_color=$RED \
-    padding_left=8 \
-    padding_right=2
-
 ##### Right: cpu graph, wifi+volume+battery, calendar #####
 
 # Calendar (rightmost)
