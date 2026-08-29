@@ -210,14 +210,31 @@ sketchybar --add item calendar right \
     script="$PLUGIN_DIR/calendar.sh" \
     --subscribe calendar system_woke
 
-# Battery / volume / wifi grouped into one pill
+# Battery / volume / wifi / opencode grouped into one pill
+sketchybar --add item opencode right \
+  --set opencode \
+    icon=":opencode:" \
+    icon.font="$APP_FONT:Regular:16.0" \
+    icon.color=$WHITE \
+    label="—" \
+    label.font="$FONT:Bold:12.0" \
+    label.color=$WHITE \
+    background.drawing=off \
+    padding_left=2 \
+    padding_right=8 \
+    popup.align=right \
+    popup.height=18 \
+    update_freq=60 \
+    script="$PLUGIN_DIR/opencode.sh" \
+    --subscribe opencode mouse.entered mouse.exited mouse.exited.global system_woke
+
 sketchybar --add item battery right \
   --set battery \
     icon.font="$FONT:Bold:16.0" \
     label.font="$FONT:Bold:12.0" \
     background.drawing=off \
     padding_left=2 \
-    padding_right=8 \
+    padding_right=2 \
     update_freq=120 \
     script="$PLUGIN_DIR/battery.sh" \
     --subscribe battery power_source_change system_woke
@@ -243,7 +260,7 @@ sketchybar --add item wifi right \
     script="$PLUGIN_DIR/wifi.sh" \
     --subscribe wifi wifi_change system_woke
 
-sketchybar --add bracket status wifi volume battery \
+sketchybar --add bracket status wifi volume battery opencode \
   --set status \
     background.color=$BG1 \
     background.corner_radius=8 \

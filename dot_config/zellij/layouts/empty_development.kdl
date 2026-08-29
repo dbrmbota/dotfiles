@@ -14,7 +14,7 @@ layout {
     }
     tab {
         pane command="opencode" {
-            args "--port"
+            args "--port" "--continue"
         }
     }
     tab name="Source Control" {
