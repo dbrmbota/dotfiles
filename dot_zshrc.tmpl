@@ -30,7 +30,7 @@ fi
 eval "$(fnm env --use-on-cd --shell zsh)"
 
 # --- Oh My Posh setup --------------------------------------------------------
-eval "$(oh-my-posh init zsh --config $(brew --prefix oh-my-posh)/themes/tokyo.omp.json)"
+eval "$(oh-my-posh init zsh --config $XDG_CONFIG_HOME/ohmyposh/theme.json)"
 
 # --- PATH --------------------------------------------------------------------
 export PATH="$PATH:/usr/local/bin"
@@ -95,6 +95,10 @@ bindkey -e
 bindkey '^[[H'  beginning-of-line    # Home
 bindkey '^[[F'  end-of-line          # End
 bindkey '^[[3~' delete-char          # Delete
+
+# Ctrl+Left/Right to move by word (Ghostty sends ^[[1;5D / ^[[1;5C)
+bindkey '^[[1;5D' backward-word      # Ctrl+Left
+bindkey '^[[1;5C' forward-word       # Ctrl+Right
 
 # HS-RS GRC project
 export TELERIK_NUGET_KEY="{{ (awsSecretsManager "hsrs/telerik-nuget-key").key }}"
