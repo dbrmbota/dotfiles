@@ -1,0 +1,112 @@
+foreground: &foreground "#c0caf5"
+background: &background "#1a1b26"
+bg_highlight: &bg_highlight "#292e42"
+selection: &selection "#283457"
+comment: &comment "#565f89"
+cyan: &cyan "#7dcfff"
+green: &green "#9ece6a"
+yellow: &yellow "#e0af68"
+orange: &orange "#ff9e64"
+magenta: &magenta "#bb9af7"
+blue: &blue "#7aa2f7"
+red: &red "#f7768e"
+purple: &purple "#9d7cd8"
+white: &white "#a9b1d6"
+black: &black "#15161e"
+
+k9s:
+  body:
+    fgColor: *foreground
+    bgColor: default
+    logoColor: *blue
+  prompt:
+    fgColor: *foreground
+    bgColor: *background
+    suggestColor: *orange
+  info:
+    fgColor: *blue
+    sectionColor: *foreground
+  help:
+    fgColor: *foreground
+    bgColor: default
+    keyColor: *magenta
+    numKeyColor: *blue
+    sectionColor: *purple
+  dialog:
+    fgColor: *foreground
+    bgColor: default
+    buttonFgColor: *foreground
+    buttonBgColor: *magenta
+    buttonFocusFgColor: *black
+    buttonFocusBgColor: *blue
+    labelFgColor: *orange
+    fieldFgColor: *foreground
+  frame:
+    border:
+      fgColor: *bg_highlight
+      focusColor: *blue
+    menu:
+      fgColor: *foreground
+      keyColor: *magenta
+      numKeyColor: *blue
+    crumbs:
+      fgColor: *black
+      bgColor: *blue
+      activeColor: *cyan
+    status:
+      newColor: *cyan
+      modifyColor: *blue
+      addColor: *green
+      pendingColor: *orange
+      errorColor: *red
+      highlightColor: *orange
+      killColor: *comment
+      completedColor: *comment
+    title:
+      fgColor: *foreground
+      bgColor: default
+      highlightColor: *blue
+      counterColor: *magenta
+      filterColor: *cyan
+  views:
+    charts:
+      bgColor: default
+      defaultDialColors:
+        - *blue
+        - *red
+      defaultChartColors:
+        - *blue
+        - *red
+    table:
+      fgColor: *foreground
+      bgColor: default
+      cursorFgColor: *black
+      cursorBgColor: *blue
+      markColor: *orange
+      header:
+        fgColor: *foreground
+        bgColor: default
+        sorterColor: *cyan
+    xray:
+      fgColor: *foreground
+      bgColor: default
+      cursorColor: *bg_highlight
+      graphicColor: *blue
+      showIcons: false
+    yaml:
+      keyColor: *magenta
+      colonColor: *blue
+      valueColor: *foreground
+    logs:
+      fgColor: *foreground
+      bgColor: default
+      indicator:
+        fgColor: *foreground
+        bgColor: default
+        toggleOnColor: *green
+        toggleOffColor: *comment
+    help:
+      fgColor: *foreground
+      bgColor: default
+      indicator:
+        fgColor: *blue
