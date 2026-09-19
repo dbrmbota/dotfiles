@@ -1,7 +1,15 @@
+{{- $screenDumpDir := joinPath .chezmoi.homeDir ".local" "share" "k9s" "screen-dumps" -}}
+{{- if eq .chezmoi.os "darwin" -}}
+{{-   $screenDumpDir = joinPath .chezmoi.homeDir "Library" "Application Support" "k9s" "screen-dumps" -}}
+{{- else if eq .chezmoi.os "windows" -}}
+{{-   $screenDumpDir = joinPath (env "LOCALAPPDATA") "k9s" "screen-dumps" -}}
+{{- else if env "XDG_DATA_HOME" -}}
+{{-   $screenDumpDir = joinPath (env "XDG_DATA_HOME") "k9s" "screen-dumps" -}}
+{{- end -}}
 k9s:
   liveViewAutoRefresh: false
   gpuVendors: {}
-  screenDumpDir: /Users/dbrmbota/Library/Application Support/k9s/screen-dumps
+  screenDumpDir: {{ $screenDumpDir }}
   refreshRate: 2
   apiServerTimeout: 2m0s
   maxConnRetry: 5
