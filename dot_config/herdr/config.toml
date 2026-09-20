@@ -9,3 +9,12 @@ delivery = "terminal"
 
 [experimental]
 pane_history = true
+
+[[keys.command]]
+key = "prefix+t"
+type = "pane"
+command = "exec \"${SHELL:-sh}\""
+description = "open scratch terminal"
+
+[ui.sound]
+enabled = true
