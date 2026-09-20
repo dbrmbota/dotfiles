@@ -1,0 +1,12 @@
+{
+  "tui.altScreen.halfPageUp": "ctrl+u",
+  "tui.altScreen.halfPageDown": "ctrl+d",
+  "tui.altScreen.lineUp": "ctrl+y",
+  "tui.altScreen.lineDown": "ctrl+e",
+  "tui.altScreen.top": ["home", "ctrl+home"],
+  "tui.altScreen.bottom": ["end", "ctrl+end"],
+
+  "tui.editor.deleteToLineStart": [],
+  "tui.editor.deleteCharForward": ["delete"],
+  "app.exit": []
+}

@@ -1,0 +1,21 @@
+{
+  "lastChangelogVersion": "0.85.1",
+  "theme": "tokyonight",
+  "defaultProvider": "opencode",
+  "defaultModel": "muse-spark-1.3",
+  "defaultThinkingLevel": "high",
+  "tuiMode": "fullscreen",
+  "packages": [
+    "npm:pi-vim",
+    "./vim-chrome",
+    "npm:pi-zentui",
+    {
+      "source": "npm:pi-web-access",
+      "extensions": []
+    },
+    "npm:pi-permission-modes"
+  ],
+  "piVim": {
+    "clipboardMirror": "yank"
+  }
+}

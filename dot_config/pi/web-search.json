@@ -1,0 +1,33 @@
+{
+  "searchRouting": {
+    "providers": ["openai", "exa"],
+    "fallbackOn": ["unsupported", "transient", "quota", "network", "invalid-response"]
+  },
+  "webSearch": {
+    "allowedProviders": ["openai", "exa"]
+  },
+  "workflow": "none",
+  "maxInlineContentChars": 20000,
+  "fetch": {
+    "timeout": 30,
+    "defaultMode": "readable",
+    "allowedModes": ["readable", "raw", "answer"]
+  },
+  "youtube": { "enabled": false },
+  "video": { "enabled": false },
+  "image": { "enabled": true },
+  "pdf": { "enabled": true },
+  "tools": {
+    "webSearch": { "enabled": true },
+    "fetchContent": { "enabled": true },
+    "getSearchContent": { "enabled": true },
+    "sourceCheck": { "enabled": false }
+  },
+  "commands": {
+    "websearch": { "enabled": true },
+    "search": { "enabled": false },
+    "curator": { "enabled": false },
+    "google-account": { "enabled": false }
+  },
+  "allowBrowserCookies": false
+}
