@@ -210,11 +210,11 @@ sketchybar --add item calendar right \
     script="$PLUGIN_DIR/calendar.sh" \
     --subscribe calendar system_woke
 
-# Battery / volume / wifi / opencode grouped into one pill
-sketchybar --add item opencode right \
-  --set opencode \
-    icon=":opencode:" \
-    icon.font="$APP_FONT:Regular:16.0" \
+# AI spend pill (per-provider usage + budgets, hover for breakdown)
+sketchybar --add item ai_usage right \
+  --set ai_usage \
+    icon="󰚩" \
+    icon.font="$FONT:Bold:16.0" \
     icon.color=$WHITE \
     label="—" \
     label.font="$FONT:Bold:12.0" \
@@ -225,8 +225,8 @@ sketchybar --add item opencode right \
     popup.align=right \
     popup.height=18 \
     update_freq=60 \
-    script="$PLUGIN_DIR/opencode.sh" \
-    --subscribe opencode mouse.entered mouse.exited mouse.exited.global system_woke
+    script="$PLUGIN_DIR/ai_usage.sh" \
+    --subscribe ai_usage mouse.entered mouse.exited mouse.exited.global system_woke
 
 sketchybar --add item battery right \
   --set battery \
@@ -260,7 +260,7 @@ sketchybar --add item wifi right \
     script="$PLUGIN_DIR/wifi.sh" \
     --subscribe wifi wifi_change system_woke
 
-sketchybar --add bracket status wifi volume battery opencode \
+sketchybar --add bracket status wifi volume battery ai_usage \
   --set status \
     background.color=$BG1 \
     background.corner_radius=8 \

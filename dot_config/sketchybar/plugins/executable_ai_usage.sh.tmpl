@@ -1,0 +1,477 @@
+#!/bin/bash
+# AI spend widget for sketchybar — per-provider daily usage + monthly budgets.
+#
+# The bar label shows the primary provider's daily spend. The popup groups
+# details into one section per provider. To add a provider (e.g. OpenAI):
+#   1. add a fetch block below writing a new $X_CACHE file,
+#   2. emit an "H|<Provider>" section in the python summary.
+#
+# OpenCode (primary provider). Cost figures come from the Console's rated
+# pipeline — the same numbers as the dashboard. (The CSV export only
+# carries billed charges, so it under-reports Go-plan and older usage.)
+#   Summaries:   GET /api/usage/summary?range={24h,7d,30d} (JSON)
+#   Daily costs: GET /api/usage/cost-by-day?range=30d (JSON, drives sparkline)
+#   SA budget:   GET /api/budgets/service-accounts/status (JSON; undocumented
+#                Console route, but accepted for service keys — falls back to
+#                member budgets from /api/v1/budgets/members when unavailable)
+#   Guides: https://opencode.ai/console/guides/usage
+#           https://opencode.ai/console/guides/budgets
+#
+# Secret is injected by chezmoi from AWS Secrets Manager, same as dot_zshrc.tmpl.
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+NAME="${NAME:-ai_usage}"
+CONSOLE_URL="https://opencode.ai/console"
+SERVICE_API_KEY="{{ (awsSecretsManager "opencode/service-account-console").key }}"
+# Budget readout follows the service account whose name contains this string.
+SA_BUDGET_MATCH="dorian.brmbota@outlook.com"
+
+SUM24_CACHE="/tmp/sketchybar-ai-sum-24h.json"
+SUM7_CACHE="/tmp/sketchybar-ai-sum-7d.json"
+SUM30_CACHE="/tmp/sketchybar-ai-sum-30d.json"
+CBD_CACHE="/tmp/sketchybar-ai-cost-by-day.json"
+MEMBER_BUDGETS_CACHE="/tmp/sketchybar-ai-member-budgets.json"
+SA_BUDGETS_CACHE="/tmp/sketchybar-ai-sa-budgets.json"
+SIG_CACHE="/tmp/sketchybar-ai-sig.txt"
+
+FONT="Hack Nerd Font"
+WHITE=0xffe2e2e3
+GREY=0xff7f8490
+GREEN=0xff9ed072
+YELLOW=0xffe7c664
+RED=0xfffc5d7c
+TRACK=0xff414868
+ORANGE=0xfff39660
+
+popup_draw() {
+  sketchybar --set "$NAME" popup.drawing="$1"
+}
+
+case "$SENDER" in
+  mouse.entered)
+    popup_draw on
+    exit 0
+    ;;
+  mouse.exited | mouse.exited.global)
+    popup_draw off
+    exit 0
+    ;;
+esac
+
+# --- Legacy fallback: local `opencode stats` when no usable service key is configured ---
+legacy_fallback() {
+  if ! command -v opencode >/dev/null 2>&1; then
+    sketchybar --set "$NAME" label="—"
+    exit 0
+  fi
+  STATS="$(opencode stats --days 1 --models 2>/dev/null | perl -pe 's/\e\[[0-9;]*[A-Za-z]//g')"
+  [ -z "$STATS" ] && { sketchybar --set "$NAME" label="—"; exit 0; }
+  ZEN_COST="$(printf '%s\n' "$STATS" | awk '
+    BEGIN { in_models=0; current=""; zen=0 }
+    {
+      gsub(/[┌┐└┘├┤│─]/, "")
+      gsub(/^[ \t]+|[ \t]+$/, "")
+      if ($0 == "MODEL USAGE") { in_models=1; current=""; next }
+      if ($0 == "TOOL USAGE" || $0 == "OVERVIEW" || $0 == "COST & TOKENS") { in_models=0; next }
+      if (!in_models) next
+      if ($0 == "") next
+      if ($0 ~ /^[^[:space:]]+\/[^[:space:]]+$/) { current=$0; next }
+      if ($1 == "Cost") { cost=$NF; gsub(/\$/, "", cost); if (current ~ /^opencode\//) zen += cost+0 }
+    }
+    END { printf "$%.2f", zen }
+  ')"
+  sketchybar --set "$NAME" label="$ZEN_COST"
+  exit 0
+}
+
+# A real service key is long (oc_sk_ plus 16 or more chars). Anything else —
+# empty, placeholder, or unrendered template when the AWS secret is missing —
+# falls back to local CLI stats.
+case "$SERVICE_API_KEY" in
+  oc_sk_????????????????*) : ;;
+  *) legacy_fallback ;;
+esac
+
+# --- OpenCode: rated usage summaries (same pipeline as the dashboard) ---
+# summary24 refreshes every run; wider windows and the daily-cost series are
+# TTL-gated. Failures reuse stale caches; without today's summary the widget
+# falls back to CLI stats.
+fetch_json() { # $1=url $2=cache $3=max-time-secs
+  if ! curl -sS --fail --max-time "$3" \
+    "$1" \
+    --header "Authorization: Bearer ${SERVICE_API_KEY}" \
+    --header "Accept: application/json" \
+    -o "$2.tmp" 2>/dev/null; then
+    [ -s "$2" ] || return 1
+  else
+    mv -f "$2.tmp" "$2"
+  fi
+  return 0
+}
+
+stale() { # $1=cache $2=ttl-secs → true when a refresh is due
+  [ -s "$1" ] || return 0
+  age=$(( $(date +%s) - $(stat -f %m "$1" 2>/dev/null || echo 0) ))
+  [ "$age" -ge "$2" ]
+}
+
+SUM_API="${CONSOLE_URL}/api/usage/summary"
+fetch_json "${SUM_API}?range=24h" "$SUM24_CACHE" 20 || legacy_fallback
+if stale "$SUM7_CACHE" 900; then fetch_json "${SUM_API}?range=7d" "$SUM7_CACHE" 20 || :; fi
+if stale "$SUM30_CACHE" 1800; then fetch_json "${SUM_API}?range=30d" "$SUM30_CACHE" 30 || :; fi
+if stale "$CBD_CACHE" 900; then fetch_json "${CONSOLE_URL}/api/usage/cost-by-day?range=30d" "$CBD_CACHE" 30 || :; fi
+
+# --- OpenCode: member budgets (fallback budget source) ---
+# Failure is non-fatal: stale cache is reused, popup omits the section if none.
+if ! curl -sS --fail --max-time 20 \
+  "${CONSOLE_URL}/api/v1/budgets/members" \
+  --header "Authorization: Bearer ${SERVICE_API_KEY}" \
+  --header "Accept: application/json" \
+  -o "$MEMBER_BUDGETS_CACHE.tmp" 2>/dev/null; then
+  [ -s "$MEMBER_BUDGETS_CACHE" ] || : # popup falls back further if needed
+else
+  mv -f "$MEMBER_BUDGETS_CACHE.tmp" "$MEMBER_BUDGETS_CACHE"
+fi
+
+# --- OpenCode: service-account budgets (monthly limit + spend per key) ---
+# Undocumented Console endpoint, but accepted for service keys. Failure is
+# non-fatal: the widget falls back to member budgets.
+if ! curl -sS --fail --max-time 20 \
+  "${CONSOLE_URL}/api/budgets/service-accounts/status" \
+  --header "Authorization: Bearer ${SERVICE_API_KEY}" \
+  --header "Accept: application/json" \
+  -o "$SA_BUDGETS_CACHE.tmp" 2>/dev/null; then
+  [ -s "$SA_BUDGETS_CACHE" ] || : # popup falls back to member budgets
+else
+  mv -f "$SA_BUDGETS_CACHE.tmp" "$SA_BUDGETS_CACHE"
+fi
+
+# --- Relative "updated …" stamp for the popup header ---
+upd_age=$(( $(date +%s) - $(stat -f %m "$SUM24_CACHE" 2>/dev/null || echo 0) ))
+if [ "$upd_age" -lt 90 ]; then UPDATED_TXT="just now"
+elif [ "$upd_age" -lt 3600 ]; then UPDATED_TXT="$((upd_age / 60))m ago"
+else UPDATED_TXT="$((upd_age / 3600))h ago"
+fi
+
+# --- Summarize: label + popup rows (python3: no jq dependency) ---
+# Row protocol: T|title|right-meta  H|header  L|line  R|left|right  S|spacer
+#               M|name|value  E|name|value(exceeded)
+#               P|color|filled|empty (usage bar)  A|kind|text (action row)
+SUMMARY="$(SA_MATCH="$SA_BUDGET_MATCH" UPDATED_TXT="$UPDATED_TXT" python3 - "$SUM24_CACHE" "$SUM7_CACHE" "$SUM30_CACHE" "$CBD_CACHE" "$MEMBER_BUDGETS_CACHE" "$SA_BUDGETS_CACHE" <<'PY'
+import datetime, json, os, sys
+
+sum24_path, sum7_path, sum30_path, cbd_path, member_path, sa_path = sys.argv[1:7]
+sa_match = os.environ.get('SA_MATCH', '').strip()
+updated = os.environ.get('UPDATED_TXT', 'recently')
+MC = 100_000_000  # microcents per USD
+BAR_W = 24  # usage-bar width in blocks
+
+def f2(mc): return f"${mc / MC:.2f}"
+def f0(mc): return f"${mc / MC:.0f}"
+
+def to_mc(v):
+    try: return int(float(v or 0))
+    except (ValueError, TypeError): return 0
+
+def compact(n):
+    if n >= 1_000_000: return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000: return f"{n / 1_000:.0f}k"
+    return f"{n:,}"
+
+def load_json(path, want):
+    try:
+        with open(path) as fh:
+            data = json.load(fh)
+        return data if isinstance(data, want) else None
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        return None
+
+def sparkline(cost_by_day, days=30):
+    end = datetime.datetime.now(datetime.timezone.utc).date()
+    one = datetime.timedelta(days=1)
+    vals = [max(0, to_mc(cost_by_day.get(str(end - one * i), 0))) for i in range(days - 1, -1, -1)]
+    peak = max(vals) or 1
+    return ''.join('▁▂▃▄▅▆▇█'[min(7, round(v / peak * 7))] for v in vals)
+
+# --- Provider: OpenCode — rated summaries (same pipeline as the dashboard) ---
+s24 = load_json(sum24_path, dict)
+s7 = load_json(sum7_path, dict)
+s30 = load_json(sum30_path, dict)
+cbd = load_json(cbd_path, list) or []
+cost_by_day = {}
+for e in cbd:
+    if isinstance(e, dict) and e.get('date'):
+        cost_by_day[e['date']] = e.get('totalCostMicroCents')
+
+# --- Provider: OpenCode — budgets (service-account preferred, members fallback) ---
+members = []; tot_spent = 0; tot_limit = 0; limited = False; resets = ''
+try:
+    with open(member_path) as fh:
+        data = json.load(fh)
+    if isinstance(data, list):
+        members = sorted(data, key=lambda m: (m.get('email') or ''))
+        for m in members:
+            tot_spent += to_mc(m.get('spent_micro_cents'))
+            lim = m.get('limit_micro_cents')
+            if lim is not None:
+                limited = True
+                tot_limit += to_mc(lim)
+            if not resets: resets = (m.get('resets_at') or '')[:10]
+except (FileNotFoundError, json.JSONDecodeError):
+    members = []
+
+sas = []
+try:
+    with open(sa_path) as fh:
+        sa_data = json.load(fh)
+    if isinstance(sa_data, list):
+        sas = sorted(sa_data, key=lambda s: (s.get('name') or ''))
+except (FileNotFoundError, json.JSONDecodeError):
+    sas = []
+
+sa = next((s for s in sas if sa_match and sa_match in (s.get('name') or '')), None)
+
+def status_color(pct, exceeded):
+    if exceeded or pct >= 100: return 'red'
+    if pct >= 80: return 'yellow'
+    return 'green'
+
+# Without today's rated summary there is nothing dashboard-accurate to show —
+# print an empty label so the shell falls back to local CLI stats.
+day = s24 if isinstance(s24, dict) else {}
+if day.get('totalCostMicroCents') is None:
+    print("LABEL|")
+    raise SystemExit
+day_cost = to_mc(day.get('totalCostMicroCents'))
+reqs = to_mc(day.get('totalRequests'))
+in_tok = to_mc(day.get('totalInputTokens'))
+out_tok = to_mc(day.get('totalOutputTokens'))
+
+# Bar label: primary provider's daily spend only.
+print(f"LABEL|{f2(day_cost)}")
+
+# --- Popup section: OpenCode ---
+print(f"T|OpenCode|updated {updated}")
+print("H|Today")
+print(f"L|{f2(day_cost)} · {reqs:,} requests")
+print(f"L|{compact(in_tok)} in · {compact(out_tok)} out")
+print("H|Budget")
+if sa is not None:
+    sp = to_mc(sa.get('spentMicroCents'))
+    sli = sa.get('limitMicroCents')
+    exc = bool(sa.get('exceeded'))
+    rst = (sa.get('resetsAt') or '')[:10]
+    rst_txt = f"resets {rst}" if rst else ""
+    if sli is None:
+        print(f"L|{f2(sp)} spent · unlimited" + (f" · {rst_txt}" if rst_txt else ""))
+    else:
+        li = to_mc(sli)
+        pct = (sp / li * 100) if li else (100 if exc else 0)
+        col = status_color(pct, exc)
+        n = max(0, min(BAR_W, round(pct / 100 * BAR_W)))
+        print(f"P|{col}|{'█' * n}|{'█' * (BAR_W - n)}")
+        print(f"R|{pct:.0f}% · {f2(sp)} of {f0(li)}|{rst_txt}")
+elif members:
+    if limited:
+        pct = (tot_spent / tot_limit * 100) if tot_limit else 0
+        print(f"L|{f2(tot_spent)} / {f0(tot_limit)} · {pct:.0f}% used" + (f" · resets {resets}" if resets else ""))
+    else:
+        print(f"L|{f2(tot_spent)} spent · unlimited" + (f" · resets {resets}" if resets else ""))
+    for m in members:
+        email = m.get('email') or m.get('user_id') or '?'
+        sp = to_mc(m.get('spent_micro_cents'))
+        lim = m.get('limit_micro_cents')
+        exc = bool(m.get('exceeded'))
+        if lim is None:
+            print(f"{'E' if exc else 'M'}|{email}|{f2(sp)}/∞")
+        else:
+            print(f"{'E' if exc else 'M'}|{email}|{f2(sp)}/{f0(to_mc(lim))}")
+else:
+    print("L|budget data unavailable (needs budgets permission)")
+
+print("H|Cost")
+print(f"L|Today: {f2(day_cost)} · {compact(in_tok + out_tok)} tokens")
+if isinstance(s7, dict) and s7.get('totalCostMicroCents') is not None:
+    print(f"L|Last 7 days: {f2(to_mc(s7.get('totalCostMicroCents')))} · {to_mc(s7.get('totalRequests')):,} requests")
+if isinstance(s30, dict) and s30.get('totalCostMicroCents') is not None:
+    print(f"L|Last 30 days: {f2(to_mc(s30.get('totalCostMicroCents')))} · {to_mc(s30.get('totalRequests')):,} requests")
+if cost_by_day:
+    print(f"P|orange|{sparkline(cost_by_day)}|")
+
+print("S|")
+print("A|refresh|Refresh Now")
+print("A|dashboard|Usage Dashboard")
+
+# --- Popup section: OpenAI (not configured yet) ---
+# To add it: fetch the subscription usage above into a new cache file, then
+# emit an "H|OpenAI" block here following the OpenCode pattern. The bar label
+# stays on the primary (OpenCode) provider.
+PY
+)"
+
+LABEL="$(printf '%s\n' "$SUMMARY" | awk -F'\|' '$1=="LABEL"{sub(/^LABEL\|/,""); print; exit}')"
+ROWS="$(printf '%s\n' "$SUMMARY" | grep -v '^LABEL|')"
+[ -z "$LABEL" ] && legacy_fallback
+sketchybar --set "$NAME" label="$LABEL"
+
+SIG="$(printf '%s\n' "$SUMMARY" | /usr/bin/cksum)"
+if [ "$SIG" = "$(cat "$SIG_CACHE" 2>/dev/null)" ] && sketchybar --query "${NAME}.line.0" >/dev/null 2>&1; then
+  exit 0
+fi
+printf '%s\n' "$SIG" > "$SIG_CACHE"
+
+# One-time cleanup of the previous non-agnostic item's popup rows.
+sketchybar --remove "/opencode\\.line\\..*/" 2>/dev/null
+sketchybar --remove "/${NAME}\\.line\\..*/" 2>/dev/null
+
+color_for() {
+  case "$1" in
+    green) printf '%s' "$GREEN" ;;
+    yellow) printf '%s' "$YELLOW" ;;
+    orange) printf '%s' "$ORANGE" ;;
+    red) printf '%s' "$RED" ;;
+    *) printf '%s' "$GREY" ;;
+  esac
+}
+
+args=()
+i=0
+while IFS= read -r row || [ -n "$row" ]; do
+  [ -z "$row" ] && continue
+  typ="${row%%|*}"
+  rest="${row#*|}"
+  id="${NAME}.line.$i"
+  args+=(
+    --add item "$id" "popup.$NAME"
+    --set "$id"
+      background.drawing=off
+      background.height=20
+      padding_left=0
+      padding_right=0
+      icon.padding_left=0
+      icon.padding_right=0
+  )
+  case "$typ" in
+    S)
+      args+=( icon.drawing=off label.drawing=off )
+      ;;
+    H)
+      args+=(
+        icon.drawing=off
+        label="$rest"
+        label.font="$FONT:Bold:10.0"
+        label.color=$GREY
+        label.padding_left=10
+        label.padding_right=10
+      )
+      ;;
+    L)
+      args+=(
+        icon.drawing=off
+        label="$rest"
+        label.font="$FONT:Regular:11.0"
+        label.color=$WHITE
+        label.padding_left=12
+        label.padding_right=10
+      )
+      ;;
+    M|E)
+      model="${rest%%|*}"
+      cost="${rest#*|}"
+      color=$GREEN
+      [ "$typ" = "E" ] && color=$RED
+      args+=(
+        icon="$model"
+        icon.font="$FONT:Regular:11.0"
+        icon.color=$WHITE
+        icon.align=left
+        icon.width=200
+        icon.padding_left=10
+        icon.padding_right=4
+        label="$cost"
+        label.font="$FONT:Bold:11.0"
+        label.color=$color
+        label.padding_left=4
+        label.padding_right=10
+      )
+      ;;
+    T)
+      tleft="${rest%%|*}"
+      tright="${rest#*|}"
+      args+=(
+        icon="$tleft"
+        icon.font="$FONT:Bold:14.0"
+        icon.color=$WHITE
+        icon.padding_left=10
+        icon.padding_right=4
+        label="$tright"
+        label.font="$FONT:Regular:11.0"
+        label.color=$GREY
+        label.padding_left=4
+        label.padding_right=10
+      )
+      ;;
+    R)
+      rleft="${rest%%|*}"
+      rright="${rest#*|}"
+      args+=(
+        icon="$rleft"
+        icon.font="$FONT:Regular:11.0"
+        icon.color=$WHITE
+        icon.padding_left=12
+        icon.padding_right=4
+        label="$rright"
+        label.font="$FONT:Regular:11.0"
+        label.color=$GREY
+        label.padding_left=4
+        label.padding_right=10
+      )
+      ;;
+    A)
+      kind="${rest%%|*}"
+      atext="${rest#*|}"
+      case "$kind" in
+        refresh) aglyph=""; aclick="$PLUGIN_DIR/ai_usage.sh" ;;
+        dashboard) aglyph=""; aclick="open $CONSOLE_URL" ;;
+        *) aglyph="•"; aclick="true" ;;
+      esac
+      args+=(
+        icon="$aglyph"
+        icon.font="$FONT:Regular:12.0"
+        icon.color=$GREY
+        icon.padding_left=12
+        icon.padding_right=6
+        label="$atext"
+        label.font="$FONT:Regular:12.0"
+        label.color=$WHITE
+        label.padding_left=2
+        label.padding_right=10
+        click_script="$aclick"
+      )
+      ;;
+    P)
+      bar_color="$(color_for "${rest%%|*}")"
+      bars="${rest#*|}"
+      filled="${bars%%|*}"
+      empty="${bars#*|}"
+      args+=(
+        icon="$filled"
+        icon.font="$FONT:Regular:12.0"
+        icon.color="$bar_color"
+        icon.padding_left=12
+        icon.padding_right=0
+        label="$empty"
+        label.font="$FONT:Regular:12.0"
+        label.color=$TRACK
+        label.padding_left=0
+        label.padding_right=10
+      )
+      ;;
+  esac
+  i=$((i + 1))
+done <<< "$ROWS"
+
+if [ ${#args[@]} -gt 0 ]; then
+  sketchybar "${args[@]}" --set "$NAME" popup.drawing=off
+fi
