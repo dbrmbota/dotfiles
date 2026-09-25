@@ -17,6 +17,8 @@
           ".",
           "/tmp",
           "/private/tmp",
+          "/var/folders",
+          "/private/var/folders",
           "~/.npm",
           "~/.cache",
           "~/Library/Caches",
@@ -175,6 +177,8 @@
         "allowWrite": [
           "/tmp",
           "/private/tmp",
+          "/var/folders",
+          "/private/var/folders",
           "~/.npm",
           "~/.cache",
           "~/Library/Caches",
