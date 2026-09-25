@@ -18,12 +18,13 @@ const OPTIONS = {
 	},
 	footer: {
 		icons: {
-			branch: "\ue0a0", // 
+			branch: "\ue0a0", //
 			cache: "\udb80\udd9c", // 󰆼
-			separatorRight: "\ue0b0", // 
-			separatorLeft: "\ue0b2", // 
+			separatorRight: "\ue0b0", //
+			separatorLeft: "\ue0b2", //
 		},
 		contextThresholds: { warning: 70, error: 90 },
+		hiddenStatuses: ["perm"], // perm mode is tied to the active agent; the chip is noise
 	},
 	blocks: {
 		railGlyph: "┃",
@@ -41,6 +42,22 @@ const OPTIONS = {
 export default function (pi: ExtensionAPI) {
 	let chromed: ChromedEditor | undefined;
 	let requestRender: (() => void) | undefined;
+	let agent: { name: string; color?: string } | undefined;
+
+	// Registered at load (before session_start) so the event emitted at startup is not missed.
+	pi.events.on("agents:change", (data) => {
+		try {
+			const d = data as { name?: unknown; color?: unknown };
+			if (d && typeof d.name === "string" && d.name) {
+				agent = { name: d.name, color: typeof d.color === "string" ? d.color : undefined };
+			} else {
+				agent = undefined;
+			}
+		} catch {
+			agent = undefined;
+		}
+		requestRender?.();
+	});
 
 	const modeLabel = () => chromed?.modeLabel() ?? " INSERT ";
 
@@ -52,6 +69,7 @@ export default function (pi: ExtensionAPI) {
 			model: ctx.model?.id,
 			provider: ctx.model?.provider,
 			thinking: ctx.thinkingLevel,
+			agent,
 		});
 
 		ctx.ui.setEditorComponent((tui, theme, keybindings) => {

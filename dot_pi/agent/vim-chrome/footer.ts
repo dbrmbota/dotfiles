@@ -21,6 +21,8 @@ export type FooterOptions = {
 		separatorLeft: string;
 	};
 	contextThresholds: { warning: number; error: number };
+	/** Status keys (from ctx.ui.setStatus) hidden from the footer middle. */
+	hiddenStatuses: string[];
 };
 
 type FooterData = Parameters<
@@ -163,8 +165,12 @@ export function createFooterFactory(
 				}
 
 				// ── middle: extension statuses ─────────────────────────
-				const statuses = [...footerData.getExtensionStatuses().values()]
-					.map((s) => s.trim())
+				// Perm mode is tied to the active agent now (editor chrome), so the
+				// pi-permission-modes chip is noise. Filtered by status key, not text.
+				const hidden = new Set(options.hiddenStatuses);
+				const statuses = [...footerData.getExtensionStatuses().entries()]
+					.filter(([key]) => !hidden.has(key))
+					.map(([, s]) => s.trim())
 					.filter(Boolean);
 				let middle = statuses.length ? ` ${mutedFg}${statuses.join("  ")}${RESET}` : "";
 

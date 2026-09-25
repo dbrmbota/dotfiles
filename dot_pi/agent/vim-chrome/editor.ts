@@ -30,6 +30,7 @@ export type EditorMeta = {
 	model?: string;
 	provider?: string;
 	thinking?: string;
+	agent?: { name: string; color?: string };
 };
 
 type MouseEvent = { x: number; y: number } & Record<string, unknown>;
@@ -214,6 +215,10 @@ function metaRow(
 	const dot = fg(theme, "dim", " · ");
 	const accent = modeColor(kind); // same colour as the rail
 	const parts: string[] = [];
+	if (meta.agent) {
+		const color = (meta.agent.color ?? accent) as Parameters<Theme["fg"]>[0];
+		parts.push(fg(theme, color, meta.agent.name));
+	}
 	if (meta.model) parts.push(fg(theme, accent, meta.model));
 	const provider = providerLabel(meta.provider);
 	if (provider) parts.push(fg(theme, "muted", provider));
