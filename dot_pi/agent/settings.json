@@ -14,7 +14,8 @@
       "extensions": []
     },
     "npm:pi-permission-modes",
-    "npm:@baylarsadigov/omp-undo-redo"
+    "npm:@baylarsadigov/omp-undo-redo",
+    "npm:@qmahyar/pi-ask"
   ],
   "piVim": {
     "clipboardMirror": "yank"
