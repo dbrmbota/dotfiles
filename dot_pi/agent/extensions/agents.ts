@@ -27,7 +27,7 @@ import { Container, SelectList, Text, type SelectItem } from "@earendil-works/pi
 /** Shortcut that opens the agent picker. pi-vim sends synthetic ctrl+a/ctrl+e/ctrl+k/ctrl+r/ctrl+_, so none of those can be used. */
 const PICKER_SHORTCUT = "alt+a";
 
-const DEFAULT_AGENT = "build";
+const DEFAULT_AGENT = "chat";
 const ACTIVE_ENTRY = "active-agent";
 const CHANGE_EVENT = "agents:change";
 
