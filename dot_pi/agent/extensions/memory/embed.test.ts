@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+	ATTEMPT_TIMEOUT_MS,
 	EMBEDDING_DIMENSIONS,
 	MAX_EMBED_TOKENS,
 	backoffDelayMs,
@@ -25,6 +26,11 @@ function jsonResponse(status: number, body: unknown, retryAfter?: string): Fetch
 	};
 }
 
+/** Backoff sleeps only (excludes the per-attempt timeout-race sleep calls). */
+function backoffs(sleeps: number[]): number[] {
+	return sleeps.filter((ms) => ms !== ATTEMPT_TIMEOUT_MS);
+}
+
 function okBody(embeddings: number[][]): unknown {
 	return { data: embeddings.map((embedding) => ({ embedding })) };
 }
@@ -38,7 +44,7 @@ function makeDeps(
 	const sleepFn: SleepFn = sleep ?? (async (ms: number) => {
 		sleeps.push(ms);
 	});
-	const fetch: FetchFn = async (_url: string, _init: unknown as never) => {
+	const fetch: FetchFn = async () => {
 		calls.count += 1;
 		const result = await handler(calls.count);
 		if (result instanceof Error) throw result;
@@ -86,7 +92,9 @@ describe("embedTexts", () => {
 			const outcome = await embedTexts(["content"], { apiKey: "key" }, { fetch, sleep: sleepFn });
 			assert.equal(outcome.ok, true, name);
 			assert.equal(calls.count, 2, name);
-			assert.equal(sleeps.length, 1, name);
+			const retrySleeps = backoffs(sleeps);
+			assert.equal(retrySleeps.length, 1, name);
+			assert.ok(retrySleeps[0] >= 400 && retrySleeps[0] <= 600, `${name}: ${retrySleeps[0]}`);
 		}
 	});
 
@@ -96,7 +104,7 @@ describe("embedTexts", () => {
 			const outcome = await embedTexts(["content"], { apiKey: "key" }, { fetch, sleep: sleepFn });
 			assert.equal(outcome.ok, false, String(status));
 			assert.equal(calls.count, 1, String(status));
-			assert.equal(sleeps.length, 0, String(status));
+			assert.equal(backoffs(sleeps).length, 0, String(status));
 		}
 	});
 
@@ -114,7 +122,7 @@ describe("embedTexts", () => {
 				: jsonResponse(200, okBody([vector(EMBEDDING_DIMENSIONS)])),
 		);
 		await embedTexts(["content"], { apiKey: "key" }, { fetch, sleep: sleepFn });
-		assert.deepEqual(sleeps, [1000]);
+		assert.deepEqual(backoffs(sleeps), [1000]);
 
 		const capped = makeDeps((call) =>
 			call === 1
@@ -122,7 +130,7 @@ describe("embedTexts", () => {
 				: jsonResponse(200, okBody([vector(EMBEDDING_DIMENSIONS)])),
 		);
 		await embedTexts(["content"], { apiKey: "key" }, { fetch: capped.fetch, sleep: capped.sleepFn });
-		assert.deepEqual(capped.sleeps, [5000]);
+		assert.deepEqual(backoffs(capped.sleeps), [5000]);
 	});
 
 	it("gives up after 3 attempts naming the last cause", async () => {
@@ -130,7 +138,10 @@ describe("embedTexts", () => {
 		const outcome = await embedTexts(["content"], { apiKey: "key" }, { fetch, sleep: sleepFn });
 		assert.equal(outcome.ok, false);
 		assert.equal(calls.count, 3);
-		assert.equal(sleeps.length, 2);
+		const giveUpSleeps = backoffs(sleeps);
+		assert.equal(giveUpSleeps.length, 2);
+		assert.ok(giveUpSleeps[0] >= 400 && giveUpSleeps[0] <= 600, `first: ${giveUpSleeps[0]}`);
+		assert.ok(giveUpSleeps[1] >= 1200 && giveUpSleeps[1] <= 1800, `second: ${giveUpSleeps[1]}`);
 		if (!outcome.ok) assert.match(outcome.reason, /3 attempts/);
 	});
 

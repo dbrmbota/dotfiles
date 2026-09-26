@@ -36,8 +36,14 @@ export const MEM_HINT_RE = /(?:^|[ \t])@(m|me|mem)$/;
  * Validate a memory name. Returns an error message, or undefined when valid.
  */
 export function validateName(name: string): string | undefined {
-	// TODO: reject empty/over-80-char names, then test NAME_RE; no dependencies.
-	throw new Error("not implemented");
+	if (name.length === 0) return "name must not be empty";
+	if (name.length > MAX_NAME_LENGTH) {
+		return `name must be at most ${MAX_NAME_LENGTH} characters (got ${name.length})`;
+	}
+	if (!NAME_RE.test(name)) {
+		return "name must be lowercase alphanumeric segments joined by single -, _, ., or / (e.g. my-memory)";
+	}
+	return undefined;
 }
 
 /**
@@ -45,8 +51,13 @@ export function validateName(name: string): string | undefined {
  * Returns an error message, or undefined when valid.
  */
 export function validateDescription(description: string): string | undefined {
-	// TODO: trim, then reject empty/over-200-char or multiline (any \n/\r) text; no dependencies.
-	throw new Error("not implemented");
+	const trimmed = description.trim();
+	if (trimmed.length === 0) return "description must not be empty";
+	if (trimmed.length > MAX_DESCRIPTION_LENGTH) {
+		return `description must be at most ${MAX_DESCRIPTION_LENGTH} characters (got ${trimmed.length})`;
+	}
+	if (/[\r\n]/.test(trimmed)) return "description must be a single line";
+	return undefined;
 }
 
 /**
@@ -56,14 +67,13 @@ export function validateDescription(description: string): string | undefined {
  * references through unchanged and only warns on unknown names).
  */
 export function extractMemToken(textBeforeCursor: string): string | undefined {
-	// TODO: match MEM_TOKEN_RE against the text before the cursor, return capture group 1 or undefined; no dependencies.
-	throw new Error("not implemented");
+	const match = textBeforeCursor.match(MEM_TOKEN_RE);
+	return match ? match[1] : undefined;
 }
 
 /** True when the text before the cursor ends with `@m`, `@me`, or `@mem`. */
 export function isMemHintToken(textBeforeCursor: string): boolean {
-	// TODO: test MEM_HINT_RE against the text before the cursor; no dependencies.
-	throw new Error("not implemented");
+	return MEM_HINT_RE.test(textBeforeCursor);
 }
 
 /**
@@ -71,8 +81,20 @@ export function isMemHintToken(textBeforeCursor: string): boolean {
  * punctuation is excluded by the regex, so `@mem:foo.` yields `foo`.
  */
 export function extractMemRefs(text: string): string[] {
-	// TODO: loop MEM_REF_RE with exec (reset lastIndex first) and collect group 1 values; no dependencies.
-	throw new Error("not implemented");
+	MEM_REF_RE.lastIndex = 0;
+	const names: string[] = [];
+	let match: RegExpExecArray | null;
+	while ((match = MEM_REF_RE.exec(text)) !== null) {
+		names.push(match[1]);
+	}
+	return names;
+}
+
+/** Strip trailing slashes and one trailing `.git` (case-insensitive). */
+function stripUrlSuffix(value: string): string {
+	const noSlashes = value.replace(/\/+$/, "");
+	if (/\.git$/i.test(noSlashes)) return noSlashes.slice(0, -4).replace(/\/+$/, "");
+	return noSlashes;
 }
 
 /**
@@ -81,14 +103,29 @@ export function extractMemRefs(text: string): string[] {
  * Local paths become `file/<absolute path>`.
  */
 export function normalizeRemoteUrl(url: string): string {
-	// TODO: trim, then in order: scp `user@host:path` syntax, `scheme://[user@]host[:port]/path` (drop scheme/userinfo/port), else local path as `file/<abs>`; strip trailing `/` + `.git`, lowercase; uses node:path posix helpers (or plain string ops) only.
-	throw new Error("not implemented");
+	const trimmed = url.trim();
+	const scp = trimmed.match(/^[^@/:\s]+@([^:/\s]+):(.*)$/);
+	if (scp) {
+		return stripUrlSuffix(`${scp[1]}/${scp[2]}`).toLowerCase();
+	}
+	const scheme = trimmed.match(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/(.*)$/);
+	if (scheme) {
+		let rest = scheme[1];
+		const at = rest.lastIndexOf("@");
+		if (at !== -1) rest = rest.slice(at + 1);
+		const slash = rest.indexOf("/");
+		const host = slash === -1 ? rest : rest.slice(0, slash);
+		const path = slash === -1 ? "" : rest.slice(slash + 1);
+		const bareHost = host.includes(":") ? host.slice(0, host.indexOf(":")) : host;
+		const combined = path ? `${bareHost}/${path}` : bareHost;
+		return stripUrlSuffix(combined).toLowerCase();
+	}
+	return stripUrlSuffix(`file/${trimmed.replace(/^\/+/, "")}`).toLowerCase();
 }
 
 /** Serialize the prefill text for the `/memory edit` editor. */
 export function serializeMemoryEdit(description: string, content: string): string {
-	// TODO: return `---\ndescription: <description>\n---\n\n<content>`; quote/escape the description when it contains `:` or newlines so pi's parseFrontmatter round-trips; no dependencies.
-	throw new Error("not implemented");
+	return `---\ndescription: ${JSON.stringify(description)}\n---\n\n${content}`;
 }
 
 /** Frontmatter parser matching pi's exported `parseFrontmatter` shape. */
@@ -110,8 +147,18 @@ export function parseMemoryEdit(
 	text: string,
 	parse: FrontmatterParser,
 ): ParsedMemoryEdit {
-	// TODO: run the injected pi `parseFrontmatter`, require a non-empty string `description` (re-check with validateDescription), require a non-empty body (error hints at `/memory delete`); never import pi here.
-	throw new Error("not implemented");
+	const { frontmatter, body } = parse(text);
+	const raw = frontmatter["description"];
+	if (typeof raw !== "string") {
+		return { ok: false, error: "missing description in frontmatter" };
+	}
+	const description = raw.trim();
+	const invalid = validateDescription(description);
+	if (invalid) return { ok: false, error: invalid };
+	if (body.trim().length === 0) {
+		return { ok: false, error: "memory content is empty — use /memory delete to remove it" };
+	}
+	return { ok: true, description, content: body };
 }
 
 /** Minimal memory fields needed to build autocomplete suggestions. */
@@ -133,8 +180,12 @@ export type FuzzyFn = <T>(items: T[], query: string, getText: (item: T) => strin
 
 /** Format an age in ms as a short relative string (`5m`, `3h`, `2d`). */
 export function formatAge(nowMs: number, tsMs: number): string {
-	// TODO: diff in ms to `<n>m` / `<n>h` / `<n>d`, clamp future/zero diffs to `0m`; no dependencies.
-	throw new Error("not implemented");
+	const diff = Math.max(0, nowMs - tsMs);
+	const minutes = Math.floor(diff / 60_000);
+	if (minutes < 60) return `${minutes}m`;
+	const hours = Math.floor(diff / 3_600_000);
+	if (hours < 24) return `${hours}h`;
+	return `${Math.floor(diff / 86_400_000)}d`;
 }
 
 /**
@@ -148,12 +199,66 @@ export function buildMemSuggestions(
 	fuzzy: FuzzyFn,
 	nowMs: number,
 ): SuggestionItem[] {
-	// TODO: empty query returns first 5 entries mapped to items; otherwise run the injected fuzzy over entries, take 20, map with value `@mem:<name>`, label `name`, description `<age> · <description>` via formatAge; never import pi-tui here.
-	throw new Error("not implemented");
+	const picked = query === "" ? entries.slice(0, 5) : fuzzy(entries, query, (entry) => entry.name).slice(0, 20);
+	return picked.map((entry) => ({
+		value: `@mem:${entry.name}`,
+		label: entry.name,
+		description: `${formatAge(nowMs, entry.lastUsedAt)} · ${entry.description}`,
+	}));
 }
 
 /** The `@mem:` hint item shown for bare `@m` / `@me` / `@mem` tokens. */
 export function buildMemHint(): SuggestionItem {
-	// TODO: return `{ value: "@mem:", label: "@mem:", description: "project memory" }`; no dependencies.
-	throw new Error("not implemented");
+	return { value: "@mem:", label: "@mem:", description: "project memory" };
+}
+
+/**
+ * Complete `/memory` arguments: `edit` / `delete` first, then entry names.
+ * Name values carry the full argument text (`"edit <name>"`) because the
+ * host replaces the whole argument prefix with the item value.
+ */
+export function completeMemoryArgs(
+	argumentPrefix: string,
+	entries: SuggestionEntry[],
+	fuzzy: FuzzyFn,
+): SuggestionItem[] {
+	const parts = argumentPrefix.split(/\s+/);
+	if (parts.length <= 1) {
+		const first = parts[0] ?? "";
+		return ["edit", "delete"]
+			.filter((sub) => sub.startsWith(first))
+			.map((sub) => ({ value: sub, label: sub }));
+	}
+	const [sub, ...rest] = parts;
+	if (sub !== "edit" && sub !== "delete") return [];
+	const query = rest.join(" ");
+	const picked = query ? fuzzy(entries, query, (entry) => entry.name).slice(0, 20) : entries.slice(0, 20);
+	return picked.map((entry) => ({
+		value: `${sub} ${entry.name}`,
+		label: entry.name,
+		description: entry.description,
+	}));
+}
+
+/** Result of applying an `@mem:` completion to the cursor line. */
+export interface AppliedCompletion {
+	text: string;
+	cursorCol: number;
+}
+
+/**
+ * Apply an `@mem:` completion: replace `prefix` before the cursor with
+ * `value` (trailing space for names, none for the `@mem:` hint).
+ * Returns null when the item is not a memory reference (caller delegates).
+ */
+export function applyMemCompletion(
+	beforeCursor: string,
+	afterCursor: string,
+	value: string,
+	prefix: string,
+): AppliedCompletion | null {
+	if (!value.startsWith("@mem:")) return null;
+	const start = Math.max(0, beforeCursor.length - prefix.length);
+	const insert = value === "@mem:" ? value : `${value} `;
+	return { text: `${beforeCursor.slice(0, start)}${insert}${afterCursor}`, cursorCol: start + insert.length };
 }

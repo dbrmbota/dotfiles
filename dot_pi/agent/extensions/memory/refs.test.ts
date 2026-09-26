@@ -4,8 +4,10 @@ import {
 	MAX_DESCRIPTION_LENGTH,
 	MAX_NAME_LENGTH,
 	NAME_RE,
+	applyMemCompletion,
 	buildMemHint,
 	buildMemSuggestions,
+	completeMemoryArgs,
 	extractMemRefs,
 	extractMemToken,
 	formatAge,
@@ -253,5 +255,59 @@ describe("buildMemHint", () => {
 		assert.equal(hint.value, "@mem:");
 		assert.equal(hint.label, "@mem:");
 		assert.equal(hint.description, "project memory");
+	});
+});
+
+describe("completeMemoryArgs", () => {
+	const entries = ["deploy-notes", "auth-flow"].map((name, i) => entry(name, i));
+
+	it("completes subcommands first", () => {
+		assert.deepEqual(completeMemoryArgs("", [], () => { throw new Error("no fuzzy"); }), [
+			{ value: "edit", label: "edit" },
+			{ value: "delete", label: "delete" },
+		]);
+		assert.deepEqual(completeMemoryArgs("e", [], () => { throw new Error("no fuzzy"); }), [
+			{ value: "edit", label: "edit" },
+		]);
+		assert.deepEqual(completeMemoryArgs("x", [], () => { throw new Error("no fuzzy"); }), []);
+	});
+
+	it("returns full argument text for names so the subcommand survives", () => {
+		assert.deepEqual(completeMemoryArgs("edit ", entries, () => { throw new Error("no fuzzy"); }), [
+			{ value: "edit deploy-notes", label: "deploy-notes", description: "Description of deploy-notes" },
+			{ value: "edit auth-flow", label: "auth-flow", description: "Description of auth-flow" },
+		]);
+	});
+
+	it("fuzzy-filters names and caps at 20", () => {
+		let seen = "";
+		const items = completeMemoryArgs("delete mem", Array.from({ length: 25 }, (_, i) => entry(`mem-${i}`, i)), (things, query) => {
+			seen = query;
+		return things;
+		});
+		assert.equal(seen, "mem");
+		assert.equal(items.length, 20);
+		assert.ok(items.every((item) => item.value.startsWith("delete mem-")));
+	});
+
+	it("returns nothing for unknown subcommands", () => {
+		assert.deepEqual(completeMemoryArgs("rename foo", entries, (things) => things), []);
+	});
+});
+
+describe("applyMemCompletion", () => {
+	it("replaces the prefix with the name plus a trailing space", () => {
+		assert.deepEqual(
+			applyMemCompletion("- @mem:re", " tail", "@mem:resource", "@mem:re"),
+			{ text: "- @mem:resource  tail", cursorCol: 16 },
+		);
+	});
+
+	it("applies the hint without a trailing space", () => {
+		assert.deepEqual(applyMemCompletion("@m", "", "@mem:", "@m"), { text: "@mem:", cursorCol: 5 });
+	});
+
+	it("delegates non-memory values", () => {
+		assert.equal(applyMemCompletion("#12", "", "#12", "#12"), null);
 	});
 });

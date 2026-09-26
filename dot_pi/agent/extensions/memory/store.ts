@@ -10,8 +10,18 @@
  * Recency rules: writes/edits set `updated_at = last_used_at = now`,
  * `memory_read` sets `accessed_at = last_used_at = now`; listing, find, and
  * delete never bump. Re-embedding happens only when `content` changes.
+ *
+ * Vector conventions: `upsertMemory` with a non-null embedding stores the
+ * vector (and marks `embedding_model`); a null embedding leaves an existing
+ * row's vector untouched (description-only path) and leaves a new row
+ * pending backfill (`embedding_model IS NULL`). Clearing a stale vector
+ * goes through `setVector(id, projectId, null)`.
  */
 
+import { DatabaseSync } from "node:sqlite";
+import * as sqliteVec from "sqlite-vec";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "./embed.ts";
 
 /** Schema version stored in `meta`. */
@@ -40,8 +50,9 @@ export interface SearchHit {
 
 /** Resolve the DB path: `$PI_MEMORY_DB`, else `~/.pi/agent/memory.db`. */
 export function getDbPath(): string {
-	// TODO: return PI_MEMORY_DB env when set, else `~/.pi/agent/memory.db` via node:os homedir + node:path join; no DB access.
-	throw new Error("not implemented");
+	const env = process.env.PI_MEMORY_DB;
+	if (env && env.trim() !== "") return env;
+	return join(homedir(), ".pi", "agent", "memory.db");
 }
 
 /**
@@ -49,8 +60,9 @@ export function getDbPath(): string {
  * (`/[\p{L}\p{N}_]+/gu` tokens). Returns null when the query has no tokens.
  */
 export function buildFtsQuery(query: string): string | null {
-	// TODO: tokenize with /[\p{L}\p{N}_]+/gu, wrap each token in double quotes (escaping embedded quotes), join with OR; null when no tokens; no dependencies.
-	throw new Error("not implemented");
+	const tokens = query.match(/[\p{L}\p{N}_]+/gu) ?? [];
+	if (tokens.length === 0) return null;
+	return tokens.map((token) => `"${token.replace(/"/g, '""')}"`).join(" OR ");
 }
 
 /**
@@ -59,9 +71,38 @@ export function buildFtsQuery(query: string): string | null {
  * first; items are deduplicated by `getKey`.
  */
 export function rrfFuse<T>(lists: T[][], getKey: (item: T) => string): T[] {
-	// TODO: score each item Σ 1/(60 + rank) across lists (rank is 0-based index within its list), dedupe by getKey keeping first-seen item, sort by score desc; no dependencies.
-	throw new Error("not implemented");
+	const scores = new Map<string, { item: T; score: number; order: number }>();
+	let order = 0;
+	for (const list of lists) {
+		list.forEach((item, rank) => {
+			const key = getKey(item);
+			const existing = scores.get(key);
+			const gain = 1 / (60 + rank);
+			if (existing) existing.score += gain;
+			else scores.set(key, { item, score: gain, order: order++ });
+		});
+	}
+	return [...scores.values()]
+		.sort((a, b) => b.score - a.score || a.order - b.order)
+		.map((entry) => entry.item);
 }
+
+/** Raw memories row as stored (snake_case columns). */
+interface MemoryRow {
+	id: number;
+	project_id: number;
+	name: string;
+	description: string;
+	content: string;
+	created_at: number;
+	updated_at: number;
+	accessed_at: number | null;
+	last_used_at: number;
+	embedding_model: string | null;
+}
+
+/** Columns selected by every read (kept in one place for mapping). */
+const MEMORY_COLUMNS = "id, project_id, name, description, content, created_at, updated_at, accessed_at, last_used_at, embedding_model";
 
 /**
  * Project-scoped memory store. Opened lazily on first use (`node:sqlite`
@@ -69,40 +110,172 @@ export function rrfFuse<T>(lists: T[][], getKey: (item: T) => string): T[] {
  * from `session_shutdown`.
  */
 export class MemoryStore {
-	// Lazily-opened DB handle; null until first use. Set in implementation.
+	private dbPath: string;
+	private db: DatabaseSync | null = null;
+	private vectorsOk: boolean = true;
+	private cachedWarning: string | undefined = undefined;
+
 	constructor(dbPath?: string) {
-	// TODO: store the resolved path (arg or getDbPath()); actual open is lazy via a private ensureOpen using node:sqlite DatabaseSync with allowExtension + sqlite-vec load + WAL/foreign_keys/busy_timeout pragmas + idempotent schema creation + model-mismatch detection.
-	throw new Error("not implemented");
+		this.dbPath = dbPath ?? getDbPath();
 	}
 
 	/** True when the DB embedding model/dimensions match this code's constants. */
 	get vectorsAvailable(): boolean {
-		// TODO: ensure open, then report whether stored meta model/dimensions match EMBEDDING_MODEL/EMBEDDING_DIMENSIONS.
-		throw new Error("not implemented");
+		this.ensureOpen();
+		return this.vectorsOk;
 	}
 
 	/** One-time FTS-only warning when the stored model/dimensions mismatch. */
 	get vectorWarning(): string | undefined {
-		// TODO: ensure open, then return the one-time FTS-only reset warning when mismatched, else undefined.
-		throw new Error("not implemented");
+		this.ensureOpen();
+		return this.vectorsOk ? undefined : this.cachedWarning;
 	}
 
 	/** Idempotently close the database. */
 	close(): void {
-		// TODO: close the DB handle if open and clear it, safe to call repeatedly or before any open.
-		throw new Error("not implemented");
+		this.db?.close();
+		this.db = null;
+	}
+
+	/** Open the DB on first use: extension, pragmas, schema, mismatch check. */
+	private ensureOpen(): DatabaseSync {
+		if (this.db) return this.db;
+		const db = new DatabaseSync(this.dbPath, { allowExtension: true });
+		sqliteVec.load(db);
+		db.exec("PRAGMA journal_mode = WAL");
+		db.exec("PRAGMA foreign_keys = ON");
+		db.exec("PRAGMA busy_timeout = 5000");
+		this.createSchema(db);
+		const model = this.getMeta(db, "embedding_model");
+		const dims = this.getMeta(db, "dimensions");
+		if (model !== EMBEDDING_MODEL || dims !== String(EMBEDDING_DIMENSIONS)) {
+			this.vectorsOk = false;
+			this.cachedWarning =
+				`memory: embedding model mismatch (database has ${model ?? "none"}/${dims ?? "none"}, ` +
+				`code expects ${EMBEDDING_MODEL}/${EMBEDDING_DIMENSIONS}) — running keyword-only. ` +
+				`Reset the database to re-enable semantic search.`;
+		}
+		this.db = db;
+		return db;
+	}
+
+	/** Read one `meta` value (no auto-open; caller holds the handle). */
+	private getMeta(db: DatabaseSync, key: string): string | undefined {
+		const row = db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as unknown as { value: string } | undefined;
+		return row?.value;
+	}
+
+	/** Idempotent v1 schema plus external-content FTS triggers. */
+	private createSchema(db: DatabaseSync): void {
+		db.exec(`
+CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+INSERT OR IGNORE INTO meta(key, value) VALUES ('schema_version', '${SCHEMA_VERSION}');
+INSERT OR IGNORE INTO meta(key, value) VALUES ('embedding_model', '${EMBEDDING_MODEL}');
+INSERT OR IGNORE INTO meta(key, value) VALUES ('dimensions', '${EMBEDDING_DIMENSIONS}');
+CREATE TABLE IF NOT EXISTS projects(
+  id INTEGER PRIMARY KEY,
+  kind TEXT NOT NULL CHECK(kind IN ('git', 'path')),
+  key TEXT NOT NULL,
+  root TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  UNIQUE(kind, key)
+);
+CREATE TABLE IF NOT EXISTS memories(
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  accessed_at INTEGER,
+  last_used_at INTEGER NOT NULL,
+  embedding_model TEXT,
+  UNIQUE(project_id, name)
+);
+CREATE INDEX IF NOT EXISTS idx_memories_recency ON memories(project_id, last_used_at DESC);
+CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+  name, description, content,
+  content='memories', content_rowid='id',
+  tokenize='porter unicode61'
+);
+CREATE TRIGGER IF NOT EXISTS memories_fts_insert AFTER INSERT ON memories BEGIN
+  INSERT INTO memories_fts(rowid, name, description, content)
+  VALUES (new.id, new.name, new.description, new.content);
+END;
+CREATE TRIGGER IF NOT EXISTS memories_fts_delete AFTER DELETE ON memories BEGIN
+  INSERT INTO memories_fts(memories_fts, rowid, name, description, content)
+  VALUES ('delete', old.id, old.name, old.description, old.content);
+END;
+CREATE TRIGGER IF NOT EXISTS memories_fts_update AFTER UPDATE ON memories BEGIN
+  INSERT INTO memories_fts(memories_fts, rowid, name, description, content)
+  VALUES ('delete', old.id, old.name, old.description, old.content);
+  INSERT INTO memories_fts(rowid, name, description, content)
+  VALUES (new.id, new.name, new.description, new.content);
+END;
+CREATE VIRTUAL TABLE IF NOT EXISTS memory_vectors USING vec0(
+  memory_id INTEGER PRIMARY KEY,
+  project_id INTEGER PARTITION KEY,
+  embedding float[${EMBEDDING_DIMENSIONS}] distance_metric=cosine
+);`);
+	}
+
+	/** Run `fn` in a `BEGIN IMMEDIATE` transaction (`node:sqlite` has none). */
+	private transaction<T>(fn: () => T): T {
+		const db = this.ensureOpen();
+		db.exec("BEGIN IMMEDIATE");
+		try {
+			const result = fn();
+			db.exec("COMMIT");
+			return result;
+		} catch (error) {
+			try {
+				db.exec("ROLLBACK");
+			} catch {
+				// The rollback itself failed; the original error matters.
+			}
+			throw error;
+		}
+	}
+
+	/** Map a raw row to a `MemoryRecord`. */
+	private toRecord(row: MemoryRow): MemoryRecord {
+		return {
+			id: row.id,
+			projectId: row.project_id,
+			name: row.name,
+			description: row.description,
+			content: row.content,
+			createdAt: row.created_at,
+			updatedAt: row.updated_at,
+			accessedAt: row.accessed_at,
+			lastUsedAt: row.last_used_at,
+			embeddingModel: row.embedding_model,
+		};
+	}
+
+	/** Encode a JS embedding as the float32 blob vec0 expects. */
+	private toBlob(vector: number[]): Uint8Array {
+		return new Uint8Array(new Float32Array(vector).buffer);
 	}
 
 	/** Get or create the project row; returns its id. */
 	ensureProject(kind: "git" | "path", key: string, root: string): number {
-		// TODO: INSERT OR IGNORE into projects then SELECT id for (kind, key), storing created_at epoch ms.
-		throw new Error("not implemented");
+		return this.transaction(() => {
+			const db = this.ensureOpen();
+			db.prepare("INSERT OR IGNORE INTO projects(kind, key, root, created_at) VALUES (?, ?, ?, ?)")
+				.run(kind, key, root, Date.now());
+			const row = db.prepare("SELECT id FROM projects WHERE kind = ? AND key = ?").get(kind, key) as unknown as { id: number };
+			return row.id;
+		});
 	}
 
 	/** Fetch one memory by name within a project. */
 	getMemory(projectId: number, name: string): MemoryRecord | undefined {
-		// TODO: SELECT the memories row for (projectId, name), mapping columns to MemoryRecord; no recency change.
-		throw new Error("not implemented");
+		const db = this.ensureOpen();
+		const row = db.prepare(`SELECT ${MEMORY_COLUMNS} FROM memories WHERE project_id = ? AND name = ?`)
+			.get(projectId, name) as unknown as MemoryRow | undefined;
+		return row ? this.toRecord(row) : undefined;
 	}
 
 	/**
@@ -118,8 +291,40 @@ export class MemoryStore {
 		embedding: number[] | null,
 		now?: number,
 	): { created: boolean } {
-		// TODO: in one BEGIN IMMEDIATE transaction: INSERT or UPDATE the row (setting embedding_model only when embedding is non-null, bumping updated_at = last_used_at = now), then setVector-equivalent delete+insert of the vec0 row when vectors are available and embedding is non-null; FTS syncs via triggers; return whether the name is new.
-		throw new Error("not implemented");
+		const at = now ?? Date.now();
+		return this.transaction(() => {
+			const db = this.ensureOpen();
+			const existing = db.prepare("SELECT id FROM memories WHERE project_id = ? AND name = ?")
+				.get(projectId, name) as unknown as { id: number } | undefined;
+			const storeVector = embedding !== null && this.vectorsOk;
+			if (!existing) {
+				db.prepare(
+					`INSERT INTO memories(project_id, name, description, content, created_at, updated_at, accessed_at, last_used_at, embedding_model)
+           VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+				).run(projectId, name, description, content, at, at, at, storeVector ? EMBEDDING_MODEL : null);
+			} else {
+				if (storeVector) {
+					db.prepare(
+						"UPDATE memories SET description = ?, content = ?, updated_at = ?, last_used_at = ?, embedding_model = ? WHERE id = ?",
+					).run(description, content, at, at, EMBEDDING_MODEL, existing.id);
+				} else {
+					db.prepare("UPDATE memories SET description = ?, content = ?, updated_at = ?, last_used_at = ? WHERE id = ?")
+						.run(description, content, at, at, existing.id);
+				}
+			}
+			const row = db.prepare("SELECT id FROM memories WHERE project_id = ? AND name = ?")
+				.get(projectId, name) as unknown as { id: number };
+			if (storeVector && embedding) this.writeVector(db, row.id, projectId, embedding);
+			return { created: !existing };
+		});
+	}
+
+	/** Delete-then-insert one vec0 row (ids as BigInt) plus the model marker. */
+	private writeVector(db: DatabaseSync, memoryId: number, projectId: number, vector: number[]): void {
+		db.prepare("DELETE FROM memory_vectors WHERE memory_id = ?").run(BigInt(memoryId));
+		db.prepare("INSERT INTO memory_vectors(memory_id, project_id, embedding) VALUES (?, ?, ?)")
+			.run(BigInt(memoryId), BigInt(projectId), this.toBlob(vector));
+		db.prepare("UPDATE memories SET embedding_model = ? WHERE id = ?").run(EMBEDDING_MODEL, memoryId);
 	}
 
 	/**
@@ -127,14 +332,27 @@ export class MemoryStore {
 	 * as BigInt). A null vector clears the row back to pending-backfill.
 	 */
 	setVector(memoryId: number, projectId: number, vector: number[] | null): void {
-		// TODO: DELETE the vec0 row, then INSERT with ids bound as BigInt and the vector as Uint8Array over Float32Array when non-null; no-op when vectors are unavailable.
-		throw new Error("not implemented");
+		const db = this.ensureOpen();
+		if (!this.vectorsOk) return;
+		if (vector === null) {
+			db.prepare("DELETE FROM memory_vectors WHERE memory_id = ?").run(BigInt(memoryId));
+			db.prepare("UPDATE memories SET embedding_model = NULL WHERE id = ?").run(memoryId);
+			return;
+		}
+		this.writeVector(db, memoryId, projectId, vector);
 	}
 
 	/** Delete a memory (row + vector; FTS cleaned by triggers). */
 	deleteMemory(projectId: number, name: string): boolean {
-		// TODO: in one transaction DELETE the vec0 row by memory id then the memories row; return whether a row existed; FTS cleanup via triggers; no recency change.
-		throw new Error("not implemented");
+		return this.transaction(() => {
+			const db = this.ensureOpen();
+			const existing = db.prepare("SELECT id FROM memories WHERE project_id = ? AND name = ?")
+				.get(projectId, name) as unknown as { id: number } | undefined;
+			if (!existing) return false;
+			db.prepare("DELETE FROM memory_vectors WHERE memory_id = ?").run(BigInt(existing.id));
+			db.prepare("DELETE FROM memories WHERE id = ?").run(existing.id);
+			return true;
+		});
 	}
 
 	/**
@@ -142,31 +360,59 @@ export class MemoryStore {
 	 * (the `memory_read` recency rule).
 	 */
 	readMemory(projectId: number, name: string, now?: number): MemoryRecord | undefined {
-		// TODO: SELECT the row, then UPDATE accessed_at = last_used_at = now (arg or Date.now()); return the refreshed record.
-		throw new Error("not implemented");
+		const at = now ?? Date.now();
+		return this.transaction(() => {
+			const db = this.ensureOpen();
+			const row = db.prepare(`SELECT ${MEMORY_COLUMNS} FROM memories WHERE project_id = ? AND name = ?`)
+				.get(projectId, name) as unknown as MemoryRow | undefined;
+			if (!row) return undefined;
+			db.prepare("UPDATE memories SET accessed_at = ?, last_used_at = ? WHERE id = ?").run(at, at, row.id);
+			return this.toRecord({ ...row, accessed_at: at, last_used_at: at });
+		});
 	}
 
 	/** Most recent memories by `last_used_at` (autocomplete listing; no bump). */
 	listRecent(projectId: number, limit: number): MemoryRecord[] {
-		// TODO: SELECT ordered by last_used_at DESC up to limit (backs the empty-query autocomplete list); no bump.
-		throw new Error("not implemented");
+		const db = this.ensureOpen();
+		const rows = db.prepare(`SELECT ${MEMORY_COLUMNS} FROM memories WHERE project_id = ? ORDER BY last_used_at DESC LIMIT ?`)
+			.all(projectId, limit) as unknown as MemoryRow[];
+		return rows.map((row) => this.toRecord(row));
 	}
 
 	/** Keyword search ranked by bm25 (name > description > content); no bump. */
 	ftsSearch(projectId: number, query: string, limit: number): MemoryRecord[] {
-		// TODO: build the MATCH expression via buildFtsQuery (empty when no tokens), JOIN memories on rowid with project_id filter, ORDER BY bm25(memories_fts, 5.0, 3.0, 1.0); no bump.
-		throw new Error("not implemented");
+		const db = this.ensureOpen();
+		const match = buildFtsQuery(query);
+		if (!match) return [];
+		const rows = db.prepare(
+			`SELECT m.${MEMORY_COLUMNS.split(", ").join(", m.")} FROM memories_fts
+       JOIN memories m ON m.id = memories_fts.rowid
+       WHERE memories_fts MATCH ? AND m.project_id = ?
+       ORDER BY bm25(memories_fts, 5.0, 3.0, 1.0)
+       LIMIT ?`,
+		).all(match, projectId, limit) as unknown as MemoryRow[];
+		return rows.map((row) => this.toRecord(row));
 	}
 
 	/** KNN vector search scoped to one project partition; no bump. */
 	vectorSearch(projectId: number, vector: number[], k: number): MemoryRecord[] {
-		// TODO: SELECT with `embedding MATCH ? AND project_id = ? AND k = ?`, binding ids as BigInt and the vector as Uint8Array over Float32Array, JOIN memories for the rows in KNN order; empty when vectors are unavailable; no bump.
-		throw new Error("not implemented");
+		const db = this.ensureOpen();
+		if (!this.vectorsOk) return [];
+		const count = Math.max(1, Math.floor(k));
+		const rows = db.prepare(
+			`SELECT m.${MEMORY_COLUMNS.split(", ").join(", m.")} FROM memory_vectors v
+       JOIN memories m ON m.id = v.memory_id
+       WHERE v.embedding MATCH ? AND v.project_id = ? AND k = ${count}`,
+		).all(this.toBlob(vector), BigInt(projectId)) as unknown as MemoryRow[];
+		return rows.map((row) => this.toRecord(row));
 	}
 
 	/** Up to `limit` rows of this project with no vector (backfill queue). */
 	getUnembedded(projectId: number, limit: number): MemoryRecord[] {
-		// TODO: SELECT rows of this project with embedding_model IS NULL ordered by rowid up to limit (memory_find backfill queue).
-		throw new Error("not implemented");
+		const db = this.ensureOpen();
+		const rows = db.prepare(
+			`SELECT ${MEMORY_COLUMNS} FROM memories WHERE project_id = ? AND embedding_model IS NULL ORDER BY id LIMIT ?`,
+		).all(projectId, limit) as unknown as MemoryRow[];
+		return rows.map((row) => this.toRecord(row));
 	}
 }
