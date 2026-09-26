@@ -49,7 +49,9 @@ export function validateDescription(description: string): string | undefined {
 
 /**
  * Extract the `@mem:` query from text before the cursor, or undefined when
- * the cursor is not inside an `@mem:` token.
+ * the cursor is not inside an `@mem:` token. Used by the autocomplete
+ * provider's `getSuggestions` (not by the `input` handler, which passes
+ * references through unchanged and only warns on unknown names).
  */
 export function extractMemToken(textBeforeCursor: string): string | undefined {
 	throw new Error("not implemented");
