@@ -36,6 +36,7 @@ export const MEM_HINT_RE = /(?:^|[ \t])@(m|me|mem)$/;
  * Validate a memory name. Returns an error message, or undefined when valid.
  */
 export function validateName(name: string): string | undefined {
+	// TODO: reject empty/over-80-char names, then test NAME_RE; no dependencies.
 	throw new Error("not implemented");
 }
 
@@ -44,6 +45,7 @@ export function validateName(name: string): string | undefined {
  * Returns an error message, or undefined when valid.
  */
 export function validateDescription(description: string): string | undefined {
+	// TODO: trim, then reject empty/over-200-char or multiline (any \n/\r) text; no dependencies.
 	throw new Error("not implemented");
 }
 
@@ -54,11 +56,13 @@ export function validateDescription(description: string): string | undefined {
  * references through unchanged and only warns on unknown names).
  */
 export function extractMemToken(textBeforeCursor: string): string | undefined {
+	// TODO: match MEM_TOKEN_RE against the text before the cursor, return capture group 1 or undefined; no dependencies.
 	throw new Error("not implemented");
 }
 
 /** True when the text before the cursor ends with `@m`, `@me`, or `@mem`. */
 export function isMemHintToken(textBeforeCursor: string): boolean {
+	// TODO: test MEM_HINT_RE against the text before the cursor; no dependencies.
 	throw new Error("not implemented");
 }
 
@@ -67,6 +71,7 @@ export function isMemHintToken(textBeforeCursor: string): boolean {
  * punctuation is excluded by the regex, so `@mem:foo.` yields `foo`.
  */
 export function extractMemRefs(text: string): string[] {
+	// TODO: loop MEM_REF_RE with exec (reset lastIndex first) and collect group 1 values; no dependencies.
 	throw new Error("not implemented");
 }
 
@@ -76,11 +81,13 @@ export function extractMemRefs(text: string): string[] {
  * Local paths become `file/<absolute path>`.
  */
 export function normalizeRemoteUrl(url: string): string {
+	// TODO: trim, then in order: scp `user@host:path` syntax, `scheme://[user@]host[:port]/path` (drop scheme/userinfo/port), else local path as `file/<abs>`; strip trailing `/` + `.git`, lowercase; uses node:path posix helpers (or plain string ops) only.
 	throw new Error("not implemented");
 }
 
 /** Serialize the prefill text for the `/memory edit` editor. */
 export function serializeMemoryEdit(description: string, content: string): string {
+	// TODO: return `---\ndescription: <description>\n---\n\n<content>`; quote/escape the description when it contains `:` or newlines so pi's parseFrontmatter round-trips; no dependencies.
 	throw new Error("not implemented");
 }
 
@@ -103,6 +110,7 @@ export function parseMemoryEdit(
 	text: string,
 	parse: FrontmatterParser,
 ): ParsedMemoryEdit {
+	// TODO: run the injected pi `parseFrontmatter`, require a non-empty string `description` (re-check with validateDescription), require a non-empty body (error hints at `/memory delete`); never import pi here.
 	throw new Error("not implemented");
 }
 
@@ -125,6 +133,7 @@ export type FuzzyFn = <T>(items: T[], query: string, getText: (item: T) => strin
 
 /** Format an age in ms as a short relative string (`5m`, `3h`, `2d`). */
 export function formatAge(nowMs: number, tsMs: number): string {
+	// TODO: diff in ms to `<n>m` / `<n>h` / `<n>d`, clamp future/zero diffs to `0m`; no dependencies.
 	throw new Error("not implemented");
 }
 
@@ -139,10 +148,12 @@ export function buildMemSuggestions(
 	fuzzy: FuzzyFn,
 	nowMs: number,
 ): SuggestionItem[] {
+	// TODO: empty query returns first 5 entries mapped to items; otherwise run the injected fuzzy over entries, take 20, map with value `@mem:<name>`, label `name`, description `<age> · <description>` via formatAge; never import pi-tui here.
 	throw new Error("not implemented");
 }
 
 /** The `@mem:` hint item shown for bare `@m` / `@me` / `@mem` tokens. */
 export function buildMemHint(): SuggestionItem {
+	// TODO: return `{ value: "@mem:", label: "@mem:", description: "project memory" }`; no dependencies.
 	throw new Error("not implemented");
 }

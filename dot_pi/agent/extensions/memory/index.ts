@@ -22,10 +22,12 @@ export const REMEMBER_PROMPT: string = "not implemented";
 
 /** Build the `/remember` prompt, appending user instructions when given. */
 export function buildRememberPrompt(instructions: string): string {
+	// TODO: join the constant REMEMBER_PROMPT steps (exactly-once memory_write, self-contained <8k-token markdown with paths/identifiers, kebab-case name + one-sentence description, memory_find-first with overwrite on near-duplicate) plus `Additional instruction from me: <args>` when instructions are non-blank; no dependencies.
 	throw new Error("not implemented");
 }
 
 /** Register tools, commands, autocomplete, and lifecycle handlers. */
 export default function (pi: ExtensionAPI): void {
+	// TODO: register memory_write (TypeBox params, sequential, armed-gate + validation + embed-first + transactional upsert + disarm/notify), memory_read (header + bump + fuzzy unknown-name error), memory_find (limit ≤20, ≤20-row backfill, FTS + KNN fused by rrfFuse, keyword-only suffix); register /remember (idle + active-tool checks, arm, sendUserMessage, agent_end disarm) and /memory edit|delete (argument completions, editor/confirm flows); wire session_start (resolveProject via pi.exec, autocomplete provider via ctx.ui, memory_read-active gating) + input passthrough (extractMemRefs unknown-name notify, always continue) + session_shutdown (store close); depends on ./store.ts, ./project.ts, ./embed.ts, ./refs.ts, typebox, @earendil-works/pi-tui fuzzyFilter, pi parseFrontmatter.
 	throw new Error("not implemented");
 }

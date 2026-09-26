@@ -47,11 +47,13 @@ export type EmbedOutcome =
 
 /** Count cl100k_base tokens in `content` (exact tokenizer check). */
 export function countTokens(content: string): number {
+	// TODO: return `encode(content).length` using `encode` from `gpt-tokenizer/encoding/cl100k_base`.
 	throw new Error("not implemented");
 }
 
 /** True when `content` fits within the model's token input limit. */
 export function isWithinTokenLimit(content: string): boolean {
+	// TODO: return `countTokens(content) <= MAX_EMBED_TOKENS`.
 	throw new Error("not implemented");
 }
 
@@ -68,6 +70,7 @@ export function embedTexts(
 	options: { apiKey: string | undefined; signal?: AbortSignal },
 	deps: { fetch: FetchFn; sleep: SleepFn },
 ): Promise<EmbedOutcome> {
+	// TODO: missing apiKey returns `{ ok: false }` immediately (no retries). Otherwise up to MAX_ATTEMPTS: POST JSON `{ model: EMBEDDING_MODEL, input: texts }` with Bearer auth via injected fetch, each attempt under a 10s timeout combined with the caller's signal via AbortSignal.any; classify retryable (network/timeout errors, 408/429/5xx, 200 without data[i].embedding of EMBEDDING_DIMENSIONS floats) vs immediate-fail 4xx; sleep backoffDelayMs between attempts honoring numeric Retry-After (capped 5s); abort stops at once. Exhaustion returns `{ ok: false, reason }` naming the last status/cause and attempt count; never throws except on abort.
 	throw new Error("not implemented");
 }
 
@@ -77,5 +80,6 @@ export function backoffDelayMs(
 	retryAfterMs: number | undefined,
 	jitter: () => number,
 ): number {
+	// TODO: base 500ms for attempt 1, 1500ms for attempt 2 (later attempts reuse the last entry), apply ±20% jitter via the injected `jitter`, override with numeric retryAfterMs capped at 5000ms when defined.
 	throw new Error("not implemented");
 }

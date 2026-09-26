@@ -37,5 +37,6 @@ export interface ProjectIdentity {
  * `cwd`. Never throws — falls back to `path:` + cwd on any failure.
  */
 export function resolveProject(cwd: string, exec: ExecFn): Promise<ProjectIdentity> {
+	// TODO: wrap everything in try/catch falling back to `{ kind: "path", key: "path:" + realpath(cwd), root: realpath(cwd) }` (node:fs realpathSync, node:path dirname). Steps via exec (each `{ cwd, timeout: 5000 }`): `git rev-parse --show-toplevel --git-common-dir` (two-line stdout; non-zero code means non-repo); `git remote` (empty means no remotes -> main-worktree root: dirname(realpath(commonDir)) when it ends in `/.git`, else toplevel); prefer `origin` else first alphabetical, `git remote get-url <r>` then normalizeRemoteUrl for the `git:` key.
 	throw new Error("not implemented");
 }
