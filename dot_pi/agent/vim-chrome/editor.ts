@@ -219,9 +219,11 @@ function metaRow(
 		const color = (meta.agent.color ?? accent) as Parameters<Theme["fg"]>[0];
 		parts.push(fg(theme, color, meta.agent.name));
 	}
-	if (meta.model) parts.push(fg(theme, accent, meta.model));
-	const provider = providerLabel(meta.provider);
-	if (provider) parts.push(fg(theme, "muted", provider));
+	var modelParts = []
+	if (meta.provider) modelParts.push(meta.provider);
+	if (meta.model) modelParts.push(meta.model)
+	const model = modelParts.join('/');
+	if (model) parts.push(fg(theme, "muted", model));
 	if (meta.thinking && meta.thinking.toLowerCase() !== "off") {
 		parts.push(fg(theme, accent, meta.thinking));
 	}
