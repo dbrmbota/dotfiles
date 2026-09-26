@@ -1,0 +1,2 @@
+# Excluded from `chezmoi apply` — dev/verification aids, not deployed.
+**/smoke.sh

@@ -1,0 +1,33 @@
+{
+	"name": "pi-memory",
+	"private": true,
+	"type": "module",
+	"version": "1.0.0",
+	"description": "Project-scoped markdown memory with hybrid search for pi",
+	"pi": {
+		"extensions": ["./index.ts"]
+	},
+	"scripts": {
+		"test": "node --test"
+	},
+	"dependencies": {
+		"gpt-tokenizer": "4.0.0",
+		"sqlite-vec": "0.1.9"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-coding-agent": "*",
+		"@earendil-works/pi-tui": "*",
+		"typebox": "*"
+	},
+	"peerDependenciesMeta": {
+		"@earendil-works/pi-coding-agent": {
+			"optional": true
+		},
+		"@earendil-works/pi-tui": {
+			"optional": true
+		},
+		"typebox": {
+			"optional": true
+		}
+	}
+}

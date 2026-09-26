@@ -1,0 +1,8 @@
+#!/bin/sh
+# pi-memory extension dependencies ({{ include "dot_pi/agent/extensions/memory/package-lock.json" | sha256sum }})
+{{- /* Reruns npm ci in the deployed extension dir when package-lock.json changes. */}}
+set -eu
+TARGET="$HOME/.pi/agent/extensions/memory"
+if [ -d "$TARGET" ]; then
+  cd "$TARGET" && npm ci --omit=dev --omit=peer --no-audit --no-fund
+fi
