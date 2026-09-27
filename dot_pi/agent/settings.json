@@ -15,7 +15,12 @@
     },
     "npm:pi-permission-modes",
     "npm:@baylarsadigov/omp-undo-redo",
-    "npm:@qmahyar/pi-ask"
+    "npm:@qmahyar/pi-ask",
+    {
+      "source": "npm:@upstash/context7-pi",
+      "skills": [],
+      "prompts": []
+    }
   ],
   "piVim": {
     "clipboardMirror": "yank"

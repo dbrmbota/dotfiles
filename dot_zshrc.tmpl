@@ -106,3 +106,6 @@ bindkey '^[[1;5C' forward-word       # Ctrl+Right
 # HS-RS GRC project
 export TELERIK_NUGET_KEY="{{ (awsSecretsManager "hsrs/telerik-nuget-key").key }}"
 
+# Context7 (pi @upstash/context7-pi extension)
+export CONTEXT7_API_KEY="{{ (awsSecretsManager "upstash/context7-api-key").key }}"
+
