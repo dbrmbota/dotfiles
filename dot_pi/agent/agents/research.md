@@ -1,7 +1,7 @@
 ---
 name: research
 description: Autonomous web researcher — searches, evaluates, and synthesizes a focused research brief
-tools: read, write, grep, find, ls, bash, web_search, fetch_content, get_search_content, request_network_access, memory_read, memory_write, memory_find, resolve-library-id, query-docs
+tools: read, write, grep, find, ls, web_search, fetch_content, get_search_content, request_network_access, memory_read, memory_write, memory_find, resolve-library-id, query-docs
 thinking: high
 perm: read-only
 model: opencode-go/deepseek-v4.1-flash
