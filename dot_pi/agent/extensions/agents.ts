@@ -5,7 +5,8 @@
  * `.pi/agents/**`, which override on name collision). One agent is always
  * active; `build` is the default and matches the settings defaults.
  *
- * `alt+a` or `/agent` opens the picker, `/agent <name>` switches directly,
+ * `ctrl+n` or `/agent` opens the picker, `/agent <name>` switches directly,
+ * `/agent <term>` opens the picker prefilled with `<term>`,
  * `/agent reload` re-runs discovery. Picking an agent applies its model,
  * thinking level, tools, perm mode, and system-prompt body. The active agent
  * is shown in the editor chrome via the `agents:change` event.
@@ -22,10 +23,9 @@ import {
 	type ExtensionAPI,
 	type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
-import { Container, SelectList, Text, type SelectItem } from "@earendil-works/pi-tui";
+import { Container, fuzzyFilter, Input, Text, truncateToWidth } from "@earendil-works/pi-tui";
 
-/** Shortcut that opens the agent picker. pi-vim sends synthetic ctrl+a/ctrl+e/ctrl+k/ctrl+r/ctrl+_, so none of those can be used. */
-const PICKER_SHORTCUT = "alt+a";
+const PICKER_SHORTCUT = "ctrl+n";
 
 const DEFAULT_AGENT = "chat";
 const ACTIVE_ENTRY = "active-agent";
@@ -307,43 +307,85 @@ export default function (pi: ExtensionAPI) {
 		return `${def.model ?? baseline.model ?? "?"} · ${def.thinking ?? baseline.thinking} · ${def.perm ?? baseline.perm}`;
 	}
 
-	async function showPicker(ctx: ExtensionContext): Promise<void> {
+	async function showPicker(ctx: ExtensionContext, initialQuery = ""): Promise<void> {
 		if (catalog.length === 0) {
 			ctx.ui.notify("agents: no agent definitions found", "warning");
 			return;
 		}
-		const items: SelectItem[] = catalog.map((d) => ({
-			value: d.name,
-			label: d.name === activeName ? `${d.name} (active)` : d.name,
-			description: describe(d),
-		}));
-		const initial = Math.max(0, catalog.findIndex((d) => d.name === activeName));
-		const result = await ctx.ui.custom<string | null>((tui, theme, _kb, done) => {
-			const container = new Container();
-			container.addChild(new DynamicBorder((s) => theme.fg("accent", s)));
-			container.addChild(new Text(theme.fg("accent", theme.bold("Select Agent"))));
-			const list = new SelectList(items, Math.min(items.length, 10), {
-				selectedPrefix: (text) => theme.fg("accent", text),
-				selectedText: (text) => theme.fg("accent", text),
-				description: (text) => theme.fg("muted", text),
-				scrollInfo: (text) => theme.fg("dim", text),
-				noMatch: (text) => theme.fg("warning", text),
-			});
-			list.setSelectedIndex(initial);
-			list.onSelect = (item) => done(item.value);
-			list.onCancel = () => done(null);
-			container.addChild(list);
-			container.addChild(new Text(theme.fg("dim", "↑↓ navigate • type to filter • enter select • esc cancel")));
-			container.addChild(new DynamicBorder((s) => theme.fg("accent", s)));
+		const result = await ctx.ui.custom<string | null>((tui, theme, kb, done) => {
+			const search = new Input();
+			if (initialQuery) search.setValue(initialQuery);
+			let matches: AgentDefinition[] = [];
+			let selected = 0;
+			const activeIndex = (list: AgentDefinition[]): number =>
+				Math.max(0, list.findIndex((d) => d.name === activeName));
+			const filter = (): void => {
+				const q = search.getValue().trim();
+				matches = q ? fuzzyFilter(catalog, q, (d) => d.name) : catalog;
+				selected = q ? 0 : activeIndex(matches);
+			};
+			filter();
+			const header = new Container();
+			const topBorder = new DynamicBorder((s) => theme.fg("accent", s));
+			const title = new Text(theme.fg("accent", theme.bold("Select Agent")));
+			header.addChild(topBorder);
+			header.addChild(title);
+			const footer = new Container();
+			const hint = new Text(theme.fg("dim", "type to search • ↑↓ navigate • enter select • esc cancel"));
+			const bottomBorder = new DynamicBorder((s) => theme.fg("accent", s));
+			footer.addChild(hint);
+			footer.addChild(bottomBorder);
 			return {
+				get focused(): boolean {
+					return search.focused;
+				},
+				set focused(value: boolean) {
+					search.focused = value;
+				},
 				render(width: number) {
-					return container.render(width);
+					const lines: string[] = [];
+					lines.push(...header.render(width));
+					lines.push(...search.render(width));
+					if (matches.length === 0) {
+						lines.push(theme.fg("warning", "  No matching agents"));
+					} else {
+						const start = Math.max(0, Math.min(selected - 5, matches.length - 10));
+						const end = Math.min(start + 10, matches.length);
+						for (let i = start; i < end; i++) {
+							const d = matches[i]!;
+							const isSelected = i === selected;
+							const cursor = isSelected ? theme.fg("accent", "→ ") : "  ";
+							const name = isSelected ? theme.fg("accent", d.name) : d.name;
+							const activeBadge = d.name === activeName ? theme.fg("muted", " (active)") : "";
+							lines.push(truncateToWidth(`${cursor}${name}${activeBadge}  ${theme.fg("muted", describe(d))}`, width));
+						}
+						if (start > 0 || end < matches.length) {
+							lines.push(theme.fg("dim", `  (${selected + 1}/${matches.length})`));
+						}
+					}
+					lines.push(...footer.render(width));
+					return lines;
 				},
 				invalidate() {
-					container.invalidate();
+					header.invalidate();
+					search.invalidate();
+					footer.invalidate();
 				},
 				handleInput(data: string) {
-					list.handleInput(data);
+					if (kb.matches(data, "tui.select.up")) {
+						if (matches.length > 0) selected = selected === 0 ? matches.length - 1 : selected - 1;
+					} else if (kb.matches(data, "tui.select.down")) {
+						if (matches.length > 0) selected = selected === matches.length - 1 ? 0 : selected + 1;
+					} else if (kb.matches(data, "tui.select.confirm")) {
+						const match = matches[selected];
+						if (match) done(match.name);
+					} else if (kb.matches(data, "tui.select.cancel")) {
+						done(null);
+					} else {
+						const before = search.getValue();
+						search.handleInput(data);
+						if (search.getValue() !== before) filter();
+					}
 					tui.requestRender();
 				},
 			};
@@ -392,7 +434,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("agent", {
-		description: "Pick the primary agent (picker, name, or reload)",
+		description: "Pick the primary agent (picker, name/search, or reload)",
 		getArgumentCompletions: (prefix) =>
 			catalog
 				.filter((d) => d.name.startsWith(prefix))
@@ -410,12 +452,12 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 			const def = find(rest.split(/\s+/)[0]!);
-			if (!def) {
-				ctx.ui.notify(`agents: unknown agent "${rest}". Available: ${catalog.map((d) => d.name).join(", ") || "none"}`, "error");
+			if (def) {
+				await applyAgent(def, ctx);
+				ctx.ui.notify(`Agent "${def.name}" activated`, "info");
 				return;
 			}
-			await applyAgent(def, ctx);
-			ctx.ui.notify(`Agent "${def.name}" activated`, "info");
+			await showPicker(ctx, rest);
 		},
 	});
 
