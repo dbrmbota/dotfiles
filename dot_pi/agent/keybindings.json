@@ -8,5 +8,7 @@
 
   "tui.editor.deleteToLineStart": [],
   "tui.editor.deleteCharForward": ["delete"],
-  "app.exit": []
+  "app.exit": [],
+
+  "app.session.toggleNamedFilter": ["ctrl+shift+n"]
 }
