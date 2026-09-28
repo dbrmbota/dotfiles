@@ -1,0 +1,5 @@
+#!/bin/sh
+# Link the auto-name local plugin ({{ include "dot_config/herdr/local-plugins/auto-name/herdr-plugin.toml" | sha256sum }})
+set -eu
+command -v herdr >/dev/null || exit 0
+herdr plugin link "$HOME/.config/herdr/local-plugins/auto-name" >/dev/null

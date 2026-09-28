@@ -1,0 +1,76 @@
+id = "local.auto-name"
+name = "Auto Name"
+version = "0.1.0"
+min_herdr_version = "0.9.1"
+platforms = ["macos", "linux"]
+
+[[startup]]
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[actions]]
+id = "sync"
+title = "Reconcile pane and tab names with foreground processes"
+contexts = ["global"]
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[actions]]
+id = "reset"
+title = "Force all pane and tab names back to automatic"
+contexts = ["global"]
+command = ["/bin/bash", "./auto-name.sh", "reset"]
+
+[[events]]
+on = "workspace.created"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "workspace.focused"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "tab.created"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "tab.closed"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "tab.moved"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "tab.focused"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "tab.renamed"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "pane.created"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "pane.closed"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "pane.moved"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "pane.focused"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "pane.exited"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "pane.agent_detected"
+command = ["/bin/bash", "./auto-name.sh", "sync"]
+
+[[events]]
+on = "pane.agent_status_changed"
+command = ["/bin/bash", "./auto-name.sh", "sync"]

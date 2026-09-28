@@ -43,6 +43,20 @@ export PATH="$HOME/go/bin/:$PATH"
 export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
 export PATH="/opt/homebrew/opt/rustup/bin:$PATH"
 
+# --- herdr auto-name ---
+# Keep Herdr pane/tab names in sync from interactive shells.
+if [[ -n ${HERDR_ENV:-} ]]; then
+  autoload -Uz add-zsh-hook
+  herdr_auto_name_sync() {
+    "${HERDR_BIN_PATH:-herdr}" plugin action invoke sync --plugin local.auto-name >/dev/null 2>&1 &!
+  }
+  herdr_auto_name_preexec() {
+    ( sleep 0.3; "${HERDR_BIN_PATH:-herdr}" plugin action invoke sync --plugin local.auto-name >/dev/null 2>&1 ) &!
+  }
+  add-zsh-hook precmd herdr_auto_name_sync
+  add-zsh-hook preexec herdr_auto_name_preexec
+fi
+
 # --- EDITOR ------------------------------------------------------------------
 export EDITOR=nvim
 

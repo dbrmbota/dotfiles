@@ -1,0 +1,7 @@
+{
+  "provider": "opencode",
+  "model": "deepseek-v4.1-flash",
+  "reasoning": "off",
+  "maxTokens": 256,
+  "maxTitleChars": 40
+}

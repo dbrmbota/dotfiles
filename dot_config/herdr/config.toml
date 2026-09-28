@@ -4,17 +4,31 @@ onboarding = false
 name = "tokyo-night"
 auto_switch = false
 
+[ui]
+prompt_new_tab_name = false
+
 [ui.toast]
 delivery = "terminal"
 
 [experimental]
 pane_history = true
 
+[keys]
+goto = ""
+
 [[keys.command]]
 key = "prefix+t"
 type = "pane"
 command = "exec \"${SHELL:-sh}\""
 description = "open scratch terminal"
+
+[[keys.command]]
+key = "prefix+g"
+type = "popup"
+command = "$HOME/.config/herdr/tab-picker.sh"
+description = "tab picker (fzf)"
+width = "90%"
+height = "80%"
 
 [ui.sound]
 enabled = true
