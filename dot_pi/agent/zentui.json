@@ -33,7 +33,9 @@
           "contextThresholds": {
             "warning": 70,
             "error": 90
-          }
+          },
+          "showCacheHit": false,
+          "separator": "dash"
         }
       }
     },
@@ -148,7 +150,8 @@
         "elapsed": true,
         "thought": true,
         "tokens": true
-      }
+      },
+      "placement": "above"
     },
     "thinkingSteps": {
       "enabled": true,
