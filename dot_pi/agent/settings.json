@@ -14,7 +14,7 @@
       "extensions": []
     },
     "npm:pi-permission-modes",
-    "npm:pi-auto-session-name",
+    "npm:@normful/pi-auto-name",
     "npm:@baylarsadigov/omp-undo-redo",
     "npm:@qmahyar/pi-ask",
     {

@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "initialRenameTrigger": "first-input",
+  "language": "en",
+  "namingContextDepth": "recent-user-messages",
+  "namingModel": "opencode/deepseek-v4.1-flash",
+  "namingStyle": "slug",
+  "replaceExistingName": "always",
+  "reRenameEveryNTurns": 10,
+  "respectExternalRenames": true,
+  "sessionNameMaxLength": 30,
+  "skipSessionNameDedup": false,
+  "surfaces": {
+    "renameHerdrPane": false,
+    "renameHerdrTab": false,
+    "renamePiSession": true,
+    "renameTmuxWindow": false,
+    "renameZellijPane": false,
+    "renameZellijTab": false
+  },
+  "windowNameMaxLength": 30
+}
