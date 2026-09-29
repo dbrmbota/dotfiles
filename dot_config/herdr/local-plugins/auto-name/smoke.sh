@@ -107,9 +107,11 @@ OUT13=$(jq -n --argjson snap "$SNAP13" --argjson procs "$PROC10" \
 RERUN=$(jq -n --argjson snap "$SNAP13" --argjson procs "$PROC10" --argjson state "$OUT13" \
   --arg home "$HOME_T" --argjson reset false -f "$JQ" 2>/dev/null | jq -c '.ops')
 if [ "$RERUN" = "[]" ]; then
-  echo "ok tab-rerun-zero-ops"; PASS=$((PASS + 1))
+  echo "ok tab-rerun-zero-ops"
+  PASS=$((PASS + 1))
 else
-  echo "FAIL tab-rerun-zero-ops: got $RERUN"; FAIL=$((FAIL + 1))
+  echo "FAIL tab-rerun-zero-ops: got $RERUN"
+  FAIL=$((FAIL + 1))
 fi
 
 # 14: null / non-object state handled like {}
@@ -117,6 +119,13 @@ run_case "state-null" "$SNAP1" "$PROC1" 'null' false "$HOME_T" \
   '.ops==[{kind:"pane",id:"w1:p1",label:"zsh: ~"}]'
 run_case "state-string" "$SNAP1" "$PROC1" '"oops"' false "$HOME_T" \
   '.ops==[{kind:"pane",id:"w1:p1",label:"zsh: ~"}]'
+
+# 15: pane label changes -> tab follows in the SAME pass (no second sync)
+SNAP15='{"workspaces":[{"workspace_id":"w1","label":"main"}],"tabs":[{"tab_id":"w1:t1","workspace_id":"w1","label":"1: zsh: a"}],"panes":[{"pane_id":"w1:p1","tab_id":"w1:t1","label":"zsh: a","agent":null,"foreground_cwd":"/a","cwd":"/a","focused":true}],"layouts":[{"tab_id":"w1:t1","focused_pane_id":"w1:p1","panes":[{"pane_id":"w1:p1","focused":true}]}]}'
+PROC15='{"w1:p1":{"foreground_process_group_id":60,"foreground_processes":[{"pid":60,"argv0":"/usr/local/bin/nvim","name":"nvim","cwd":"/a"}]}}'
+STATE15='{"panes":{"w1:p1":"zsh: a"},"tabs":{"w1:t1":{"written":"1: zsh: a","base":null}}}'
+run_case "tab-follows-pane-same-pass" "$SNAP15" "$PROC15" "$STATE15" false "$HOME_T" \
+  '.ops==[{kind:"pane",id:"w1:p1",label:"nvim"},{kind:"tab",id:"w1:t1",label:"1: nvim"}]'
 
 echo "---"
 echo "pass=$PASS fail=$FAIL"

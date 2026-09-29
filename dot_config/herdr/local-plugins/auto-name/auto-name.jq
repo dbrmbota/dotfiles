@@ -120,9 +120,12 @@ def tab_base($t; $cur; $tabs; $reset):
         | .eff[$id] = effective_label($pane; null)
       else
         (pane_auto_name($pane; $procs; $home)) as $auto
-        | (effective_label($pane; $auto)) as $eff
-        | .eff[$id] = $eff
         | (is_owned($pane; $cur; $procs; .panes[$id]; $reset)) as $owned
+        # Use the label the pane will have *after* this pass, so the tab
+        # naming in the same run sees the new pane name instead of the stale one.
+        | .eff[$id] =
+            (if $owned and $auto != null then $auto
+             else effective_label($pane; $auto) end)
         | pane_apply($id; $cur; $auto; $owned)
       end))) as $panes
 | (reduce $ordered[] as $t ({ops: $panes.ops, panes: $panes.panes,
