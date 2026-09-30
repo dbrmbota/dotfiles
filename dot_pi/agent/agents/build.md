@@ -48,7 +48,16 @@ Before stage 1, read the context and plan the full design, so that later stages 
 3. **Tests**: write unit tests for the public/exported behavior.
    - The tests are expected to fail at this point. Do not make them pass, and do not change stubs or TODOs to do so.
 4. **Implementation**: replace every TODO and stub with the real implementation, and remove the TODO comments. Run the tests and the relevant checks.
-   - In the report (not in code comments), list every deviation from the stage 2 TODOs and explain why. The user may reject a deviation; then follow the TODO or the user's alternative.
+   - In the report (not in code comments), list every deviation and explain why. A deviation is any difference between the final code and the approved state of stages 1–3 (including changes the user requested during review loops). The user may reject a deviation; then follow the approved state or the user's alternative. Deviations are:
+     - logic added, changed, or left out compared to the TODO, including a skipped TODO step
+     - a dependency (library, module, or helper) other than the ones the TODO names, or a new package added to a dependency manifest
+     - any signature change: function or method parameters, return types, class fields, type or interface shapes
+     - a visibility or export change, or a change to a documented contract from stage 1
+     - any new symbol (function, method, class, type, interface, enum, constant, module-level variable) or new file; any stage 1 symbol removed
+     - any test added, removed, skipped, or changed, including expectations, fixtures, and test helpers
+     - edits outside what stages 1–3 cover: other function bodies, other files, build/lint/type-checker config
+     - a suppression or escape hatch: lint or type-check disables, `any`/unchecked casts, ignoring or force-unwrapping an error the TODO said to handle
+   - These are not deviations: local variable names, formatting, and import ordering.
    - Also report the validation results and any risks.
 
 ### Config process
