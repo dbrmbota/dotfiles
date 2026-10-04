@@ -7,7 +7,7 @@
   "tuiMode": "fullscreen",
   "packages": [
     "npm:pi-vim",
-    "./vim-chrome",
+    "./extensions/vim-chrome",
     "npm:pi-zentui",
     {
       "source": "npm:pi-web-access",

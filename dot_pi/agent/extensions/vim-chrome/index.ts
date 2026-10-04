@@ -2,7 +2,10 @@
  * vim-chrome — opencode-style editor frame + LazyVim-style powerline footer
  * on top of pi-vim's ModalEditor.
  *
- * Load order in settings.json must be: npm:pi-vim, ./vim-chrome, npm:pi-zentui.
+ * Load order in settings.json must be: npm:pi-vim, ./extensions/vim-chrome, npm:pi-zentui.
+ * Keep the ./extensions/vim-chrome entry in settings.json packages even though it lives in
+ * extensions/: auto-discovered extensions rank ahead of packages, so without the entry this
+ * would load before pi-vim and install() would bail.
  * Zentui must have components.editor.enabled=false and footer.style="native".
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
