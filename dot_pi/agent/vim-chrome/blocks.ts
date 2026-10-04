@@ -1,5 +1,5 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
-import { Box, Text, type TuiMouseEvent } from "@earendil-works/pi-tui";
+import { Box, Markdown, Text, type TuiMouseEvent } from "@earendil-works/pi-tui";
 import { RESET_FG, bgToFg, fgAnsi } from "./style";
 
 type ThemeColor = Parameters<Theme["fg"]>[0];
@@ -47,16 +47,19 @@ function railFor(theme: Theme, bg: string, options: BlockChromeOptions): string 
 }
 
 /**
- * Give every background-filled Box/Text (user messages, tool calls, compaction,
- * custom messages) the same left rail as the editor chrome.
+ * Give every background-filled Box/Text/Markdown (user messages, tool calls,
+ * compaction, custom messages) the same left rail as the editor chrome.
  */
 export function installBlockChrome(getTheme: () => Theme, options: BlockChromeOptions): () => void {
-	const patch = (proto: Patchable, bgKey: string) => {
+	const patch = (
+		proto: Patchable,
+		getBg: (self: Record<string, unknown>) => BgFn | undefined,
+	): (() => void) => {
 		const original = proto[ORIGINAL] ?? { render: proto.render, handleMouse: proto.handleMouse };
 		proto[ORIGINAL] = original;
 
 		proto.render = function (this: Record<string, unknown>, width: number): string[] {
-			const bg = backgroundOf(this[bgKey] as BgFn | undefined);
+			const bg = backgroundOf(getBg(this));
 			if (!bg || width <= RAIL_WIDTH + 1) return original.render.call(this, width);
 			const lines = original.render.call(this, width - RAIL_WIDTH);
 			if (lines.length === 0) return lines;
@@ -67,7 +70,7 @@ export function installBlockChrome(getTheme: () => Theme, options: BlockChromeOp
 		if (original.handleMouse) {
 			const originalMouse = original.handleMouse;
 			proto.handleMouse = function (this: Record<string, unknown>, event: TuiMouseEvent) {
-				if (!backgroundOf(this[bgKey] as BgFn | undefined)) return originalMouse.call(this, event);
+				if (!backgroundOf(getBg(this))) return originalMouse.call(this, event);
 				if (event.x < RAIL_WIDTH) return undefined;
 				return originalMouse.call(this, {
 					...event,
@@ -85,8 +88,12 @@ export function installBlockChrome(getTheme: () => Theme, options: BlockChromeOp
 	};
 
 	const undo = [
-		patch(Box.prototype as unknown as Patchable, "bgFn"),
-		patch(Text.prototype as unknown as Patchable, "customBgFn"),
+		patch(Box.prototype as unknown as Patchable, (self) => self.bgFn as BgFn | undefined),
+		patch(Text.prototype as unknown as Patchable, (self) => self.customBgFn as BgFn | undefined),
+		patch(
+			Markdown.prototype as unknown as Patchable,
+			(self) => (self.defaultTextStyle as { bgColor?: BgFn } | undefined)?.bgColor,
+		),
 	];
 	return () => {
 		for (const fn of undo) fn();
