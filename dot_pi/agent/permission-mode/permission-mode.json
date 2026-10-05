@@ -232,7 +232,8 @@
             "files.pythonhosted.org",
             "proxy.golang.org",
             "crates.io",
-            "*.crates.io"
+            "*.crates.io",
+            "release-assets.githubusercontent.com"
           ],
           "deniedDomains": []
         },
