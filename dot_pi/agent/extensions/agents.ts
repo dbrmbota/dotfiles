@@ -3,7 +3,7 @@
  *
  * Agent definitions live in `~/.pi/agent/agents/*.md` (plus trusted-project
  * `.pi/agents/**`, which override on name collision). One agent is always
- * active; `build` is the default and matches the settings defaults.
+ * active; `chat` is the default and matches the settings defaults.
  *
  * `ctrl+n` or `/agent` opens the picker, `/agent <name>` switches directly,
  * `/agent <term>` opens the picker prefilled with `<term>`,
@@ -168,7 +168,7 @@ function projectTrusted(ctx: ExtensionContext | undefined): boolean {
 	}
 }
 
-/** User agents, then trusted-project overrides. `build` sorts first. */
+/** User agents, then trusted-project overrides. The default agent sorts first. */
 function discoverAgents(cwd: string, trusted: boolean): AgentDefinition[] {
 	const map = new Map<string, AgentDefinition>();
 	for (const f of walkMd(path.join(agentDir(), "agents"))) {
@@ -258,6 +258,25 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
+	/**
+	 * Apply an agent's tool set, or the baseline when it defines none. Warns
+	 * about unknown tools and keeps the current set when nothing is known.
+	 */
+	function applyTools(def: AgentDefinition, ctx: ExtensionContext): void {
+		let allNames: string[] = [];
+		try {
+			allNames = pi.getAllTools().map((t) => t.name);
+		} catch {
+			allNames = [];
+		}
+		const want = def.tools ?? baseline.tools;
+		const unknown = want.filter((t) => !allNames.includes(t));
+		if (unknown.length > 0) ctx.ui.notify(`agents: unknown tools: ${unknown.join(", ")}`, "warning");
+		const valid = want.filter((t) => allNames.includes(t));
+		if (valid.length > 0) pi.setActiveTools(valid);
+		else ctx.ui.notify(`agents: "${def.name}" enables no known tools; keeping current tools`, "warning");
+	}
+
 	async function applyAgent(def: AgentDefinition, ctx: ExtensionContext): Promise<void> {
 		// 1. model (setModel resets thinking, so thinking comes after).
 		const spec = def.model ?? baseline.model;
@@ -277,18 +296,7 @@ export default function (pi: ExtensionAPI) {
 		pi.setThinkingLevel(def.thinking ?? baseline.thinking);
 		// 3. tools, then 4. perm: perm-modes re-applies hideTools on every
 		// before_agent_start, so tools must come first.
-		let allNames: string[] = [];
-		try {
-			allNames = pi.getAllTools().map((t) => t.name);
-		} catch {
-			allNames = [];
-		}
-		const want = def.tools ?? baseline.tools;
-		const unknown = want.filter((t) => !allNames.includes(t));
-		if (unknown.length > 0) ctx.ui.notify(`agents: unknown tools: ${unknown.join(", ")}`, "warning");
-		const valid = want.filter((t) => allNames.includes(t));
-		if (valid.length > 0) pi.setActiveTools(valid);
-		else ctx.ui.notify(`agents: "${def.name}" enables no known tools; keeping current tools`, "warning");
+		applyTools(def, ctx);
 		const target = def.perm ?? baseline.perm;
 		if (process.env.PI_PERMISSION_MODE !== target) {
 			pi.sendUserMessage(`/perm ${target}`, { expandPromptTemplates: true });
@@ -416,12 +424,18 @@ export default function (pi: ExtensionAPI) {
 		return undefined;
 	}
 
-	/** Name only: model, thinking, and tools were already restored by pi. */
-	function adoptName(ctx: ExtensionContext): void {
+	/**
+	 * Adopt the agent restored from the transcript on resume, reload, or branch
+	 * navigation: resolve the restored name (falling back to the default), then
+	 * re-apply its tools and announce the change. Core restores the model and
+	 * thinking from the session, but not the tools.
+	 */
+	function adoptAgent(ctx: ExtensionContext): void {
 		const name = restoredName(ctx);
 		const def = (name && find(name)) ?? find(DEFAULT_AGENT);
 		if (!def) return;
 		activeName = def.name;
+		applyTools(def, ctx);
 		emitChange(def);
 	}
 
@@ -466,6 +480,11 @@ export default function (pi: ExtensionAPI) {
 		const def = active();
 		if (!def) return;
 		const opts = event.systemPromptOptions;
+		if (def.tools !== undefined) {
+			const allowed = new Set(def.tools);
+			const filtered = opts.selectedTools.filter((n) => allowed.has(n));
+			if (filtered.length !== opts.selectedTools.length) opts.selectedTools = filtered;
+		}
 		if (def.body) {
 			if (def.systemPrompt === "replace") opts.customPrompt = def.body;
 			else opts.sections["agent"] = def.body;
@@ -488,7 +507,7 @@ export default function (pi: ExtensionAPI) {
 			const def = find(DEFAULT_AGENT) ?? catalog[0];
 			if (def) await applyAgent(def, ctx);
 		} else {
-			adoptName(ctx);
+			adoptAgent(ctx);
 		}
 	});
 
@@ -496,6 +515,6 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_tree", async (_event, ctx) => {
 		if (!ctx.hasUI) return;
 		lastCtx = ctx;
-		adoptName(ctx);
+		adoptAgent(ctx);
 	});
 }
