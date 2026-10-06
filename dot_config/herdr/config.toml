@@ -4,6 +4,10 @@ onboarding = false
 name = "tokyo-night"
 auto_switch = false
 
+[theme.custom]
+sidebar_bg = "#16161e"
+surface_dim = "#3b4261"
+
 [ui]
 prompt_new_tab_name = false
 
