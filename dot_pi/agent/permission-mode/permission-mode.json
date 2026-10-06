@@ -233,7 +233,9 @@
             "proxy.golang.org",
             "crates.io",
             "*.crates.io",
-            "release-assets.githubusercontent.com"
+            "release-assets.githubusercontent.com",
+            "go.temporal.io",
+            "registry-1.docker.io"
           ],
           "deniedDomains": []
         },
