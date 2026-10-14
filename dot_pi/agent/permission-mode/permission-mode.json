@@ -72,7 +72,11 @@
             "files.pythonhosted.org",
             "proxy.golang.org",
             "crates.io",
-            "*.crates.io"
+            "*.crates.io",
+            "release-assets.githubusercontent.com",
+            "go.temporal.io",
+            "registry-1.docker.io",
+            "opencode.ai"
           ],
           "deniedDomains": []
         },
@@ -235,7 +239,8 @@
             "*.crates.io",
             "release-assets.githubusercontent.com",
             "go.temporal.io",
-            "registry-1.docker.io"
+            "registry-1.docker.io",
+            "opencode.ai"
           ],
           "deniedDomains": []
         },
