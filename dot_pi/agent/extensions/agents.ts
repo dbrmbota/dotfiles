@@ -481,9 +481,10 @@ export default function (pi: ExtensionAPI) {
 		if (!def) return;
 		const opts = event.systemPromptOptions;
 		if (def.tools !== undefined) {
-			const allowed = new Set(def.tools);
-			const filtered = opts.selectedTools.filter((n) => allowed.has(n));
-			if (filtered.length !== opts.selectedTools.length) opts.selectedTools = filtered;
+			const order = new Map(def.tools.map((n, i): [string, number] => [n, i]));
+			const next = opts.selectedTools.filter((n) => order.has(n)).sort((a, b) => order.get(a)! - order.get(b)!);
+			const changed = next.length !== opts.selectedTools.length || next.some((n, i) => n !== opts.selectedTools[i]);
+			if (changed) opts.selectedTools = next;
 		}
 		if (def.body) {
 			if (def.systemPrompt === "replace") opts.customPrompt = def.body;
