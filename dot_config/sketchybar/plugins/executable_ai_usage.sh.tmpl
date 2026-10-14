@@ -10,10 +10,11 @@
 # pipeline — the same numbers as the dashboard. (The CSV export only
 # carries billed charges, so it under-reports Go-plan and older usage.)
 #   Summaries:   GET /api/usage/summary?range={24h,7d,30d} (JSON)
-#   Daily costs: GET /api/usage/cost-by-day?range=30d (JSON, drives sparkline)
-#   SA budget:   GET /api/budgets/service-accounts/status (JSON; undocumented
-#                Console route, but accepted for service keys — falls back to
-#                member budgets from /api/v1/budgets/members when unavailable)
+#   Daily costs: GET /api/usage/cost-by-day?range=30d (JSON; drives the sparkline)
+#   Budgets:     GET /api/v2/budgets/members (JSON; per-member policy: limit and
+#                spend, counted from 2026-10-14; requires budgets:read)
+#   Legacy /api/budgets/* returns 409 since the policy migration, and
+#   /api/policies/current-budgets returns 403 for service keys.
 #   Guides: https://opencode.ai/console/guides/usage
 #           https://opencode.ai/console/guides/budgets
 #
@@ -24,15 +25,12 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 NAME="${NAME:-ai_usage}"
 CONSOLE_URL="https://opencode.ai/console"
 SERVICE_API_KEY="{{ (awsSecretsManager "opencode/service-account-console").key }}"
-# Budget readout follows the service account whose name contains this string.
-SA_BUDGET_MATCH="dorian.brmbota@outlook.com"
 
 SUM24_CACHE="/tmp/sketchybar-ai-sum-24h.json"
 SUM7_CACHE="/tmp/sketchybar-ai-sum-7d.json"
 SUM30_CACHE="/tmp/sketchybar-ai-sum-30d.json"
 CBD_CACHE="/tmp/sketchybar-ai-cost-by-day.json"
-MEMBER_BUDGETS_CACHE="/tmp/sketchybar-ai-member-budgets.json"
-SA_BUDGETS_CACHE="/tmp/sketchybar-ai-sa-budgets.json"
+MEMBER_BUDGETS_CACHE="/tmp/sketchybar-ai-member-budgets-v2.json"
 SIG_CACHE="/tmp/sketchybar-ai-sig.txt"
 
 FONT="Hack Nerd Font"
@@ -122,30 +120,9 @@ if stale "$SUM7_CACHE" 900; then fetch_json "${SUM_API}?range=7d" "$SUM7_CACHE" 
 if stale "$SUM30_CACHE" 1800; then fetch_json "${SUM_API}?range=30d" "$SUM30_CACHE" 30 || :; fi
 if stale "$CBD_CACHE" 900; then fetch_json "${CONSOLE_URL}/api/usage/cost-by-day?range=30d" "$CBD_CACHE" 30 || :; fi
 
-# --- OpenCode: member budgets (fallback budget source) ---
-# Failure is non-fatal: stale cache is reused, popup omits the section if none.
-if ! curl -sS --fail --max-time 20 \
-  "${CONSOLE_URL}/api/v1/budgets/members" \
-  --header "Authorization: Bearer ${SERVICE_API_KEY}" \
-  --header "Accept: application/json" \
-  -o "$MEMBER_BUDGETS_CACHE.tmp" 2>/dev/null; then
-  [ -s "$MEMBER_BUDGETS_CACHE" ] || : # popup falls back further if needed
-else
-  mv -f "$MEMBER_BUDGETS_CACHE.tmp" "$MEMBER_BUDGETS_CACHE"
-fi
-
-# --- OpenCode: service-account budgets (monthly limit + spend per key) ---
-# Undocumented Console endpoint, but accepted for service keys. Failure is
-# non-fatal: the widget falls back to member budgets.
-if ! curl -sS --fail --max-time 20 \
-  "${CONSOLE_URL}/api/budgets/service-accounts/status" \
-  --header "Authorization: Bearer ${SERVICE_API_KEY}" \
-  --header "Accept: application/json" \
-  -o "$SA_BUDGETS_CACHE.tmp" 2>/dev/null; then
-  [ -s "$SA_BUDGETS_CACHE" ] || : # popup falls back to member budgets
-else
-  mv -f "$SA_BUDGETS_CACHE.tmp" "$SA_BUDGETS_CACHE"
-fi
+# --- OpenCode: member budgets (per-member limit, spend and reset date) ---
+# Failure is non-fatal: stale cache is reused, popup shows what it can.
+fetch_json "${CONSOLE_URL}/api/v2/budgets/members" "$MEMBER_BUDGETS_CACHE" 20 || :
 
 # --- Relative "updated …" stamp for the popup header ---
 upd_age=$(( $(date +%s) - $(stat -f %m "$SUM24_CACHE" 2>/dev/null || echo 0) ))
@@ -158,11 +135,10 @@ fi
 # Row protocol: T|title|right-meta  H|header  L|line  R|left|right  S|spacer
 #               M|name|value  E|name|value(exceeded)
 #               P|color|filled|empty (usage bar)  A|kind|text (action row)
-SUMMARY="$(SA_MATCH="$SA_BUDGET_MATCH" UPDATED_TXT="$UPDATED_TXT" python3 - "$SUM24_CACHE" "$SUM7_CACHE" "$SUM30_CACHE" "$CBD_CACHE" "$MEMBER_BUDGETS_CACHE" "$SA_BUDGETS_CACHE" <<'PY'
+SUMMARY="$(UPDATED_TXT="$UPDATED_TXT" python3 - "$SUM24_CACHE" "$SUM7_CACHE" "$SUM30_CACHE" "$CBD_CACHE" "$MEMBER_BUDGETS_CACHE" <<'PY'
 import datetime, json, os, sys
 
-sum24_path, sum7_path, sum30_path, cbd_path, member_path, sa_path = sys.argv[1:7]
-sa_match = os.environ.get('SA_MATCH', '').strip()
+sum24_path, sum7_path, sum30_path, cbd_path, member_path = sys.argv[1:6]
 updated = os.environ.get('UPDATED_TXT', 'recently')
 MC = 100_000_000  # microcents per USD
 BAR_W = 24  # usage-bar width in blocks
@@ -194,43 +170,63 @@ def sparkline(cost_by_day, days=30):
     peak = max(vals) or 1
     return ''.join('▁▂▃▄▅▆▇█'[min(7, round(v / peak * 7))] for v in vals)
 
+def member_entry(budgets):
+    """Return the workspace's single member entry from the v2 member budgets list.
+
+    Returns None when budgets is None, empty, or not a list of objects.
+    """
+    if isinstance(budgets, list) and budgets and isinstance(budgets[0], dict):
+        return budgets[0]
+    return None
+
+
+def reset_date(member, now):
+    """Return the budget reset day as YYYY-MM-DD.
+
+    Uses the first 10 characters of the member's resets_at when present,
+    otherwise the first day of the next UTC month.
+    """
+    resets_at = (member or {}).get('resets_at')
+    if resets_at:
+        return resets_at[:10]
+    first = now.replace(day=1)
+    return (first + datetime.timedelta(days=32)).replace(day=1).strftime('%Y-%m-%d')
+
+
+def member_budget_rows(member, now):
+    """Return the Budget section popup rows from the member's budget entry.
+
+    member is the entry from member_entry, or None when there is none. Spend is
+    the member's spent_micro_cents and the cap is its limit_micro_cents (None
+    when unlimited). The reset day comes from reset_date. Returns P and R rows
+    when capped, an L row when unlimited, and an L row saying the data is
+    unavailable when member is None.
+    """
+    if member is None:
+        return ["L|budget data unavailable (needs budgets:read)"]
+    spent = to_mc(member.get('spent_micro_cents'))
+    resets = reset_date(member, now)
+    limit = member.get('limit_micro_cents')
+    if limit is None:
+        return [f"L|{f2(spent)} spent · unlimited · resets {resets}"]
+    limit = to_mc(limit)
+    pct = (spent / limit * 100) if limit else 100
+    col = status_color(pct, spent >= limit)
+    n = max(0, min(BAR_W, round(pct / 100 * BAR_W)))
+    return [
+        f"P|{col}|{'█' * n}|{'█' * (BAR_W - n)}",
+        f"R|{pct:.0f}% · {f2(spent)} of {f0(limit)}|resets {resets}",
+    ]
+
+
 # --- Provider: OpenCode — rated summaries (same pipeline as the dashboard) ---
 s24 = load_json(sum24_path, dict)
 s7 = load_json(sum7_path, dict)
 s30 = load_json(sum30_path, dict)
-cbd = load_json(cbd_path, list) or []
-cost_by_day = {}
-for e in cbd:
-    if isinstance(e, dict) and e.get('date'):
-        cost_by_day[e['date']] = e.get('totalCostMicroCents')
-
-# --- Provider: OpenCode — budgets (service-account preferred, members fallback) ---
-members = []; tot_spent = 0; tot_limit = 0; limited = False; resets = ''
-try:
-    with open(member_path) as fh:
-        data = json.load(fh)
-    if isinstance(data, list):
-        members = sorted(data, key=lambda m: (m.get('email') or ''))
-        for m in members:
-            tot_spent += to_mc(m.get('spent_micro_cents'))
-            lim = m.get('limit_micro_cents')
-            if lim is not None:
-                limited = True
-                tot_limit += to_mc(lim)
-            if not resets: resets = (m.get('resets_at') or '')[:10]
-except (FileNotFoundError, json.JSONDecodeError):
-    members = []
-
-sas = []
-try:
-    with open(sa_path) as fh:
-        sa_data = json.load(fh)
-    if isinstance(sa_data, list):
-        sas = sorted(sa_data, key=lambda s: (s.get('name') or ''))
-except (FileNotFoundError, json.JSONDecodeError):
-    sas = []
-
-sa = next((s for s in sas if sa_match and sa_match in (s.get('name') or '')), None)
+cbd = load_json(cbd_path, list)
+cost_by_day = None if cbd is None else {
+    e['date']: e.get('totalCostMicroCents') for e in cbd if isinstance(e, dict) and e.get('date')
+}
 
 def status_color(pct, exceeded):
     if exceeded or pct >= 100: return 'red'
@@ -257,38 +253,10 @@ print("H|Today")
 print(f"L|{f2(day_cost)} · {reqs:,} requests")
 print(f"L|{compact(in_tok)} in · {compact(out_tok)} out")
 print("H|Budget")
-if sa is not None:
-    sp = to_mc(sa.get('spentMicroCents'))
-    sli = sa.get('limitMicroCents')
-    exc = bool(sa.get('exceeded'))
-    rst = (sa.get('resetsAt') or '')[:10]
-    rst_txt = f"resets {rst}" if rst else ""
-    if sli is None:
-        print(f"L|{f2(sp)} spent · unlimited" + (f" · {rst_txt}" if rst_txt else ""))
-    else:
-        li = to_mc(sli)
-        pct = (sp / li * 100) if li else (100 if exc else 0)
-        col = status_color(pct, exc)
-        n = max(0, min(BAR_W, round(pct / 100 * BAR_W)))
-        print(f"P|{col}|{'█' * n}|{'█' * (BAR_W - n)}")
-        print(f"R|{pct:.0f}% · {f2(sp)} of {f0(li)}|{rst_txt}")
-elif members:
-    if limited:
-        pct = (tot_spent / tot_limit * 100) if tot_limit else 0
-        print(f"L|{f2(tot_spent)} / {f0(tot_limit)} · {pct:.0f}% used" + (f" · resets {resets}" if resets else ""))
-    else:
-        print(f"L|{f2(tot_spent)} spent · unlimited" + (f" · resets {resets}" if resets else ""))
-    for m in members:
-        email = m.get('email') or m.get('user_id') or '?'
-        sp = to_mc(m.get('spent_micro_cents'))
-        lim = m.get('limit_micro_cents')
-        exc = bool(m.get('exceeded'))
-        if lim is None:
-            print(f"{'E' if exc else 'M'}|{email}|{f2(sp)}/∞")
-        else:
-            print(f"{'E' if exc else 'M'}|{email}|{f2(sp)}/{f0(to_mc(lim))}")
-else:
-    print("L|budget data unavailable (needs budgets permission)")
+now = datetime.datetime.now(datetime.timezone.utc)
+member = member_entry(load_json(member_path, list))
+for row in member_budget_rows(member, now):
+    print(row)
 
 print("H|Cost")
 print(f"L|Today: {f2(day_cost)} · {compact(in_tok + out_tok)} tokens")
