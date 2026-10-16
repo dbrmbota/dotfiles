@@ -10,6 +10,12 @@
  * `/agent reload` re-runs discovery. Picking an agent applies its model,
  * thinking level, tools, perm mode, and system-prompt body. The active agent
  * is shown in the editor chrome via the `agents:change` event.
+ *
+ * Agent bodies can use variables: `$NAME`, `${NAME}`, and `${NAME:-default}`.
+ * Only names that other extensions publish over the `agents:vars` event are
+ * replaced: a string value sets the name, `null` removes it. Other `$NAME`
+ * forms stay literal, and `${NAME:-default}` falls back to `default` when the
+ * name is not set. Expansion runs on every agent start.
  */
 
 import * as fs from "node:fs";
@@ -30,6 +36,10 @@ const PICKER_SHORTCUT = "ctrl+n";
 const DEFAULT_AGENT = "chat";
 const ACTIVE_ENTRY = "active-agent";
 const CHANGE_EVENT = "agents:change";
+const VARS_EVENT = "agents:vars";
+
+/** Variables published over `agents:vars`, used by `expandAgentVars` for agent bodies. */
+const agentVars = new Map<string, string>();
 
 type ThinkingLevel = "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
 const THINKING_LEVELS: ThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
@@ -207,7 +217,38 @@ function readJson(file: string): Record<string, unknown> | undefined {
 	return undefined;
 }
 
+/**
+ * Replace `$NAME`, `${NAME}`, and `${NAME:-default}` in an agent body. Only names
+ * present in `vars` are replaced; `${NAME:-default}` uses `default` when NAME is
+ * absent. Names match `[A-Z][A-Z0-9_]*`; `$NAME` ends at the first other character.
+ * Substituted values are not expanded again.
+ */
+export function expandAgentVars(body: string, vars: ReadonlyMap<string, string>): string {
+	return body.replace(
+		/\$\{([A-Z][A-Z0-9_]*)(?::-([^}]*))?\}|\$([A-Z][A-Z0-9_]*)/g,
+		(match: string, braced: string | undefined, fallback: string | undefined, bare: string | undefined) => {
+			const name = braced ?? bare;
+			if (name === undefined) return match;
+			const value = vars.get(name);
+			if (value !== undefined) return value;
+			if (braced !== undefined && fallback !== undefined) return fallback;
+			return match;
+		},
+	);
+}
+
+/** Apply one `agents:vars` update: a string sets the name, `null` removes it. */
+function mergeAgentVars(update: Record<string, string | null>): void {
+	for (const [name, value] of Object.entries(update)) {
+		if (typeof value === "string") agentVars.set(name, value);
+		else if (value === null) agentVars.delete(name);
+	}
+}
+
 export default function (pi: ExtensionAPI) {
+	pi.events.on(VARS_EVENT, (data) => {
+		if (typeof data === "object" && data !== null) mergeAgentVars(data as Record<string, string | null>);
+	});
 	let catalog: AgentDefinition[] = [];
 	let baseline: Baseline = { thinking: "high", tools: [], perm: "default" };
 	let activeName = DEFAULT_AGENT;
@@ -487,8 +528,9 @@ export default function (pi: ExtensionAPI) {
 			if (changed) opts.selectedTools = next;
 		}
 		if (def.body) {
-			if (def.systemPrompt === "replace") opts.customPrompt = def.body;
-			else opts.sections["agent"] = def.body;
+			const body = expandAgentVars(def.body, agentVars);
+			if (def.systemPrompt === "replace") opts.customPrompt = body;
+			else opts.sections["agent"] = body;
 		}
 		if (!def.contextFiles) opts.contextFiles = [];
 		if (def.skills !== undefined) {

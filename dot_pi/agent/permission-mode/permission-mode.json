@@ -109,7 +109,9 @@
           "/private/var/folders/*": "allow",
           "*@earendil-works/pi-coding-agent*": "allow",
           "~/.pi/agent/npm/node_modules": "allow",
-          "~/.pi/agent/npm/node_modules/*": "allow"
+          "~/.pi/agent/npm/node_modules/*": "allow",
+          "~/.pi/agent/artifacts": "allow",
+          "~/.pi/agent/artifacts/*": "allow"
         },
         "read": "allow",
         "grep": "allow",
@@ -273,7 +275,9 @@
           "/private/var/folders/*": "allow",
           "*@earendil-works/pi-coding-agent*": "allow",
           "~/.pi/agent/npm/node_modules": "allow",
-          "~/.pi/agent/npm/node_modules/*": "allow"
+          "~/.pi/agent/npm/node_modules/*": "allow",
+          "~/.pi/agent/artifacts": "allow",
+          "~/.pi/agent/artifacts/*": "allow"
         },
         "read": "allow",
         "grep": "allow",
@@ -286,7 +290,9 @@
           "/private/tmp": "allow",
           "/private/tmp/*": "allow",
           "/var/folders/*": "allow",
-          "/private/var/folders/*": "allow"
+          "/private/var/folders/*": "allow",
+          "~/.pi/agent/artifacts": "allow",
+          "~/.pi/agent/artifacts/*": "allow"
         },
         "edit": {
           "*": "deny",
@@ -295,7 +301,9 @@
           "/private/tmp": "allow",
           "/private/tmp/*": "allow",
           "/var/folders/*": "allow",
-          "/private/var/folders/*": "allow"
+          "/private/var/folders/*": "allow",
+          "~/.pi/agent/artifacts": "allow",
+          "~/.pi/agent/artifacts/*": "allow"
         },
         "bash": {
           "*": "allow",

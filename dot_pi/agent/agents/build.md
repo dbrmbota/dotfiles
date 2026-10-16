@@ -1,7 +1,7 @@
 ---
 name: build
 description: Implementation agent for normal tasks and approved handoffs
-tools: read, grep, find, ls, bash, edit, write, ask_user, fetch_content, request_network_access, memory_read
+tools: read, grep, find, ls, bash, edit, write, ask_user, fetch_content, request_network_access
 thinking: high
 perm: default
 model: opencode-go/claude-haiku-5-5
