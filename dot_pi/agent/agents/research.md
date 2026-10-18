@@ -1,9 +1,8 @@
 ---
 name: research
 description: Autonomous researcher — investigates the web, current project, and local system to produce a focused research and feasibility brief
-tools: read, write, bash, grep, find, ls, web_search, fetch_content, get_search_content, request_network_access, resolve-library-id, query-docs
+tools: read, write, bash, grep, find, ls, web_search, fetch_content, get_search_content, resolve-library-id, query-docs
 thinking: high
-perm: read-only
 model: opencode-go/grok-4.7
 ---
 

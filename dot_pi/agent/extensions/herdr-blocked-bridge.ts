@@ -5,7 +5,7 @@
 // a custom `herdr:blocked` event, but nothing emits it. Pi itself emits
 // `ui_prompt_start` / `ui_prompt_end` around every blocking `ctx.ui.*` dialog
 // (select/confirm/input/editor/custom) — including the approval prompts from
-// pi-permission-modes — so this companion translates one into the other.
+// pi-sandbox — so this companion translates one into the other.
 //
 // Without it, Herdr's Pi integration has "lifecycle authority" and skips its
 // screen-based fallback, so the pane stays "working" while a prompt is open and

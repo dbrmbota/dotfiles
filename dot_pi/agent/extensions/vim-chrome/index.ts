@@ -27,7 +27,7 @@ const OPTIONS = {
 			separatorLeft: "\ue0b2", //
 		},
 		contextThresholds: { warning: 70, error: 90 },
-		hiddenStatuses: ["perm"], // perm mode is tied to the active agent; the chip is noise
+		hiddenStatuses: ["sandbox"], // the pi-sandbox chip is noise
 	},
 	blocks: {
 		railGlyph: "┃",

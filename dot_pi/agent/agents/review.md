@@ -1,9 +1,8 @@
 ---
 name: review
 description: Versatile review specialist for code diffs, plans, proposed solutions, codebase health, and PR/issue validation
-tools: read, grep, find, ls, bash, fetch_content, request_network_access
+tools: read, grep, find, ls, bash, fetch_content
 thinking: max
-perm: read-only
 model: opencode/gpt-6.1-sol
 ---
 

@@ -8,7 +8,7 @@
  * `ctrl+n` or `/agent` opens the picker, `/agent <name>` switches directly,
  * `/agent <term>` opens the picker prefilled with `<term>`,
  * `/agent reload` re-runs discovery. Picking an agent applies its model,
- * thinking level, tools, perm mode, and system-prompt body. The active agent
+ * thinking level, tools, and system-prompt body. The active agent
  * is shown in the editor chrome via the `agents:change` event.
  *
  * Agent bodies can use variables: `$NAME`, `${NAME}`, and `${NAME:-default}`.
@@ -50,7 +50,6 @@ interface AgentDefinition {
 	description: string;
 	model?: string;
 	thinking?: ThinkingLevel;
-	perm?: string;
 	tools?: string[];
 	/** undefined = normal skill discovery; defined (even empty) = keep only these. */
 	skills?: string[];
@@ -67,7 +66,6 @@ interface Baseline {
 	model?: string;
 	thinking: ThinkingLevel;
 	tools: string[];
-	perm: string;
 }
 
 function agentDir(): string {
@@ -121,7 +119,6 @@ function parseAgentFile(filePath: string, source: AgentDefinition["source"]): Ag
 		description,
 		model: str(fm.model),
 		thinking: parseThinking(fm.thinking),
-		perm: str(fm.perm),
 		tools: strList(fm.tools),
 		skills: strList(fm.skills),
 		systemPrompt: str(fm.systemPrompt) === "replace" ? "replace" : "append",
@@ -250,7 +247,7 @@ export default function (pi: ExtensionAPI) {
 		if (typeof data === "object" && data !== null) mergeAgentVars(data as Record<string, string | null>);
 	});
 	let catalog: AgentDefinition[] = [];
-	let baseline: Baseline = { thinking: "high", tools: [], perm: "default" };
+	let baseline: Baseline = { thinking: "high", tools: [] };
 	let activeName = DEFAULT_AGENT;
 	let lastCtx: ExtensionContext | undefined;
 
@@ -286,9 +283,7 @@ export default function (pi: ExtensionAPI) {
 					: undefined;
 		const thinking =
 			parseThinking(settings?.defaultThinkingLevel) ?? (pi.getThinkingLevel() as ThinkingLevel) ?? "high";
-		const permFile = readJson(path.join(agentDir(), "permission-mode", "permission-mode.json"));
-		const perm = typeof permFile?.defaultMode === "string" && permFile.defaultMode.trim() ? permFile.defaultMode.trim() : "default";
-		baseline = { model, thinking, tools: baselineTools(), perm };
+		baseline = { model, thinking, tools: baselineTools() };
 	}
 
 	function emitChange(def: AgentDefinition): void {
@@ -335,14 +330,9 @@ export default function (pi: ExtensionAPI) {
 		}
 		// 2. thinking.
 		pi.setThinkingLevel(def.thinking ?? baseline.thinking);
-		// 3. tools, then 4. perm: perm-modes re-applies hideTools on every
-		// before_agent_start, so tools must come first.
+		// 3. tools.
 		applyTools(def, ctx);
-		const target = def.perm ?? baseline.perm;
-		if (process.env.PI_PERMISSION_MODE !== target) {
-			pi.sendUserMessage(`/perm ${target}`, { expandPromptTemplates: true });
-		}
-		// 5. persist + chrome.
+		// 4. persist + chrome.
 		activeName = def.name;
 		try {
 			pi.appendEntry(ACTIVE_ENTRY, { name: def.name });
@@ -353,7 +343,7 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	function describe(def: AgentDefinition): string {
-		return `${def.model ?? baseline.model ?? "?"} · ${def.thinking ?? baseline.thinking} · ${def.perm ?? baseline.perm}`;
+		return `${def.model ?? baseline.model ?? "?"} · ${def.thinking ?? baseline.thinking}`;
 	}
 
 	async function showPicker(ctx: ExtensionContext, initialQuery = ""): Promise<void> {

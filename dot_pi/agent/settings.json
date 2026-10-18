@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.2.0",
+  "lastChangelogVersion": "1.3.0",
   "theme": "tokyonight",
   "defaultProvider": "opencode",
   "defaultModel": "muse-spark-1.3",
@@ -13,7 +13,7 @@
       "source": "npm:pi-web-access",
       "extensions": []
     },
-    "npm:pi-permission-modes",
+    "npm:pi-sandbox",
     "npm:@normful/pi-auto-name",
     "npm:@baylarsadigov/omp-undo-redo",
     "npm:@qmahyar/pi-ask",

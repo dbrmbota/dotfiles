@@ -1,9 +1,8 @@
 ---
 name: plan
 description: Planning specialst agent for desinging implementation plans.
-tools: read, grep, find, ls, bash, edit, write, ask_user, fetch_content, request_network_access
+tools: read, grep, find, ls, bash, edit, write, ask_user, fetch_content
 thinking: high
-perm: read-only
 model: opencode/claude-opus-5-5
 ---
 

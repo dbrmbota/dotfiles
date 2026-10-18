@@ -165,8 +165,7 @@ export function createFooterFactory(
 				}
 
 				// ── middle: extension statuses ─────────────────────────
-				// Perm mode is tied to the active agent now (editor chrome), so the
-				// pi-permission-modes chip is noise. Filtered by status key, not text.
+				// The pi-sandbox chip is noise here. Filtered by status key, not text.
 				const hidden = new Set(options.hiddenStatuses);
 				const statuses = [...footerData.getExtensionStatuses().entries()]
 					.filter(([key]) => !hidden.has(key))
