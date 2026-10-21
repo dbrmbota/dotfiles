@@ -2,6 +2,7 @@
 name: build
 description: Implementation agent for normal tasks and approved handoffs
 tools: read, grep, find, ls, bash, edit, write, ask_user, fetch_content
+skills: []
 thinking: high
 model: opencode-go/claude-haiku-5-5
 ---

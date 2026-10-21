@@ -19,7 +19,10 @@
       "release-assets.githubusercontent.com",
       "go.temporal.io",
       "registry-1.docker.io",
-      "opencode.ai"
+      "opencode.ai",
+      "numerique-gouv.github.io",
+      "quay.io",
+      "hub.docker.com"
     ],
     "deniedDomains": []
   },

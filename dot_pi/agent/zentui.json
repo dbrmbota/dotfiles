@@ -2,7 +2,7 @@
   "components": {
     "editor": {
       "enabled": false,
-      "style": "minimalist",
+      "style": "opencode",
       "codexQuota": false,
       "colorSource": "theme",
       "borderColorMode": "static",
@@ -35,9 +35,14 @@
             "error": 90
           },
           "showCacheHit": false,
-          "separator": "dash"
+          "separator": "dash",
+          "formats": {
+            "bottomLeft": "$session_name$join_sep($git_branch)"
+          }
         }
-      }
+      },
+      "rail": "▎",
+      "asciiRail": "▎"
     },
     "footer": {
       "style": "native",
@@ -101,14 +106,16 @@
     },
     "userMessages": {
       "enabled": false,
-      "style": "labeled",
+      "style": "framed",
       "colorSource": "theme",
       "styles": {
         "framed": {},
         "framed-copy-friendly": {},
         "compact": {},
         "labeled": {}
-      }
+      },
+      "rail": "▎",
+      "asciiRail": "▎"
     },
     "selectorBorders": {
       "enabled": true,
