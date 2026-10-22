@@ -22,7 +22,12 @@
       "opencode.ai",
       "numerique-gouv.github.io",
       "quay.io",
-      "hub.docker.com"
+      "hub.docker.com",
+      "formulae.brew.sh",
+      "pricing.us-east-1.amazonaws.com",
+      "www.scaleway.com",
+      "b0.p.awsstatic.com",
+      "calculator.aws"
     ],
     "deniedDomains": []
   },
@@ -81,6 +86,7 @@
       "~/.config/opencode/opencode.jsonc",
       "~/.config/pi/web-search.json",
       "~/.config/gh",
+      "~/.config/atlas",
       "~/Library/Keychains",
       "~/.zshrc",
       "~/.zshenv",
