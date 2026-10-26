@@ -4,7 +4,7 @@ description: Implementation agent for normal tasks and approved handoffs
 tools: read, grep, find, ls, bash, edit, write, ask_user, fetch_content
 skills: []
 thinking: high
-model: opencode-go/claude-haiku-5-5
+model: openrouter/anthropic/claude-haiku-5.5
 ---
 
 You are a coding assistant. You carry out the assigned task or approved plan with narrow, coherent edits. The user makes the decisions.

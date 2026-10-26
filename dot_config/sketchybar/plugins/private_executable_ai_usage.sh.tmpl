@@ -1,0 +1,476 @@
+#!/bin/bash
+# AI spend widget for sketchybar — OpenRouter key usage: today's spend, budget,
+# 30-day activity, top models.
+#
+# Authenticates with the OpenRouter management key (it can create and delete
+# API keys, so this file is private). It tracks one API key, found by its
+# masked label in the key list:
+#   Keys:     GET /api/v1/keys — every run (update_freq=60 throttles it);
+#             the key's spend windows and its own limit.
+#   Activity: GET /api/v1/activity?api_key_hash=<hash> — every 30 min;
+#             30-day sparkline, request/token totals, top models.
+#             Completed days only.
+# day/week/month are OpenRouter's UTC windows, so "today" resets at 01:00
+# Zagreb time (02:00 in summer).
+#
+# Secret is injected by chezmoi from AWS Secrets Manager, same as dot_zshrc.tmpl.
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+NAME="${NAME:-ai_usage}"
+API="https://openrouter.ai/api/v1"
+DASH_URL="https://openrouter.ai/activity"
+MGMT_KEY="{{ (awsSecretsManager "openrouter/management-key-usage").key }}"
+KEY_LABEL="sk-or-v1-cca...99a"   # masked label of the tracked key (not secret)
+KEYS_CACHE="/tmp/sketchybar-or-keys.json"
+SIG_CACHE="/tmp/sketchybar-ai-sig.txt"
+
+FONT="Hack Nerd Font"
+WHITE=0xffe2e2e3
+GREY=0xff7f8490
+GREEN=0xff9ed072
+YELLOW=0xffe7c664
+RED=0xfffc5d7c
+TRACK=0xff414868
+ORANGE=0xfff39660
+
+popup_draw() {
+  sketchybar --set "$NAME" popup.drawing="$1"
+}
+
+case "$SENDER" in
+  mouse.entered)
+    popup_draw on
+    exit 0
+    ;;
+  mouse.exited | mouse.exited.global)
+    popup_draw off
+    exit 0
+    ;;
+esac
+
+no_data() {
+  sketchybar --set "$NAME" label="—"
+  exit 0
+}
+
+# Prints the hash of the KEY_LABEL entry in KEYS_CACHE, or nothing.
+key_hash() {
+  python3 -c 'import json,sys
+try:
+    data = json.load(open(sys.argv[1])).get("data", [])
+    print(next((e.get("hash", "") for e in data if isinstance(e, dict) and e.get("label") == sys.argv[2]), ""))
+except (OSError, ValueError, AttributeError, TypeError):
+    pass' "$KEYS_CACHE" "$KEY_LABEL"
+}
+
+# --- OpenRouter: key list and activity ---
+fetch_json() { # $1=url $2=cache $3=max-time-secs
+  if ! curl -sS --fail --max-time "$3" \
+    "$1" \
+    --header "Authorization: Bearer ${MGMT_KEY}" \
+    --header "Accept: application/json" \
+    -o "$2.tmp" 2>/dev/null; then
+    [ -s "$2" ] || return 1
+  else
+    mv -f "$2.tmp" "$2"
+  fi
+  return 0
+}
+
+stale() { # $1=cache $2=ttl-secs → true when a refresh is due
+  [ -s "$1" ] || return 0
+  age=$(( $(date +%s) - $(stat -f %m "$1" 2>/dev/null || echo 0) ))
+  [ "$age" -ge "$2" ]
+}
+
+case "$MGMT_KEY" in
+  sk-or-????????????????*) : ;;
+  *) no_data ;;
+esac
+
+fetch_json "$API/keys" "$KEYS_CACHE" 15 || no_data
+KEY_HASH="$(key_hash)"
+if [ -n "$KEY_HASH" ]; then
+  ACT_CACHE="/tmp/sketchybar-or-activity-${KEY_HASH:0:12}.json"
+  if stale "$ACT_CACHE" 1800; then fetch_json "$API/activity?api_key_hash=$KEY_HASH" "$ACT_CACHE" 30 || :; fi
+else
+  ACT_CACHE=""
+fi
+
+# --- Relative "updated …" stamp for the popup header ---
+upd_age=$(( $(date +%s) - $(stat -f %m "$KEYS_CACHE" 2>/dev/null || echo 0) ))
+if [ "$upd_age" -lt 90 ]; then UPDATED_TXT="just now"
+elif [ "$upd_age" -lt 3600 ]; then UPDATED_TXT="$((upd_age / 60))m ago"
+else UPDATED_TXT="$((upd_age / 3600))h ago"
+fi
+
+# --- Summarize: label + popup rows (python3: no jq dependency) ---
+# Row protocol: T|title|right-meta  H|header  L|line  R|left|right  S|spacer
+#               M|name|value  E|name|value(exceeded)
+#               P|color|filled|empty (usage bar)  A|kind|text (action row)
+SUMMARY="$(KEY_LABEL="$KEY_LABEL" UPDATED_TXT="$UPDATED_TXT" python3 - "$KEYS_CACHE" "$ACT_CACHE" <<'PY'
+import datetime, json, os, sys
+
+BAR_W = 24  # usage-bar width in blocks
+
+def num(v):
+    """Return v as a float. None and values that cannot be read as numbers give 0.0."""
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+def usd(v):
+    """Return v as a dollar string with two decimals, e.g. "$1.23"."""
+    return f"${num(v):.2f}"
+
+def compact(n):
+    if n >= 1_000_000: return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000: return f"{n / 1_000:.0f}k"
+    return f"{n:,}"
+
+def load_json(path, want):
+    try:
+        with open(path) as fh:
+            data = json.load(fh)
+        return data if isinstance(data, want) else None
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        return None
+
+def status_color(pct, exceeded):
+    if exceeded or pct >= 100: return 'red'
+    if pct >= 80: return 'yellow'
+    return 'green'
+
+def window_dates(today, days=30):
+    """Return the YYYY-MM-DD strings of the days UTC days ending at today, oldest first."""
+    return [(today - datetime.timedelta(days=i)).isoformat() for i in range(days - 1, -1, -1)]
+
+def sparkline(cost_by_day, today, days=30):
+    """Return one block character per day of the window_dates window, scaled to the window's peak day.
+
+    cost_by_day maps YYYY-MM-DD to USD. Missing days count as 0.
+    """
+    vals = [max(0.0, num(cost_by_day.get(d))) for d in window_dates(today, days)]
+    peak = max(vals) or 1.0
+    return ''.join('▁▂▃▄▅▆▇█'[min(7, round(v / peak * 7))] for v in vals)
+
+def key_entry(keys, label):
+    """Return the entry of keys['data'] whose label equals label, or None.
+
+    keys is the parsed /keys response, or None when it did not load.
+    """
+    if not isinstance(keys, dict) or not isinstance(keys.get('data'), list):
+        return None
+    return next((e for e in keys['data'] if isinstance(e, dict) and e.get('label') == label), None)
+
+def reset_text(entry):
+    """Return the reset phrase for the key's budget window, from entry['limit_reset'].
+
+    daily gives "resets tomorrow", weekly "resets next Monday" and monthly
+    "resets 1st of next month". None, or any other value, gives "no reset".
+    """
+    phrases = {'daily': 'resets tomorrow', 'weekly': 'resets next Monday', 'monthly': 'resets 1st of next month'}
+    return phrases.get(entry.get('limit_reset'), 'no reset')
+
+def budget_rows(entry):
+    """Return the Budget section rows from the key's own limit fields.
+
+    limit None gives one L row with this month's spend. A capped key gives a P bar
+    and an R row with the percent, spend and reset_text. Spend is limit minus
+    limit_remaining, or the usage window matching limit_reset when limit_remaining
+    is None, clamped at 0.
+    """
+    limit = entry.get('limit')
+    if limit is None:
+        return [f"L|no spend cap · {usd(entry.get('usage_monthly'))} this month"]
+    limit = num(limit)
+    remaining = entry.get('limit_remaining')
+    window = {'daily': 'usage_daily', 'weekly': 'usage_weekly', 'monthly': 'usage_monthly'}.get(entry.get('limit_reset'), 'usage')
+    if remaining is None:
+        spent = max(0.0, num(entry.get(window)))
+    else:
+        spent = max(0.0, limit - num(remaining))
+    pct = spent / limit * 100 if limit else 100
+    col = status_color(pct, spent >= limit)
+    n = max(0, min(BAR_W, round(pct / 100 * BAR_W)))
+    return [
+        f"P|{col}|{'█' * n}|{'█' * (BAR_W - n)}",
+        f"R|{pct:.0f}% · {usd(spent)} of ${limit:.0f}|{reset_text(entry)}",
+    ]
+
+def activity_items(activity):
+    """Return the row dicts of activity['data'], or None when activity is not a dict with a data list."""
+    if not isinstance(activity, dict) or not isinstance(activity.get('data'), list):
+        return None
+    return [row for row in activity['data'] if isinstance(row, dict)]
+
+def daily_costs(items, today, usage_daily):
+    """Return {YYYY-MM-DD: USD} summed per UTC date over items.
+
+    Today's entry is replaced by usage_daily, because /activity covers completed days only.
+    """
+    costs = {}
+    for row in items:
+        if row.get('date'):
+            costs[row['date']] = costs.get(row['date'], 0.0) + num(row.get('usage'))
+    costs[today.isoformat()] = num(usage_daily)
+    return costs
+
+def activity_rows(items, today, usage_daily):
+    """Return the "Last 30 days" L row and the orange sparkline P row, or [] when items is None.
+
+    Cost, requests and tokens are summed over window_dates. Tokens are prompt_tokens
+    plus completion_tokens.
+    """
+    if items is None:
+        return []
+    costs = daily_costs(items, today, usage_daily)
+    window = set(window_dates(today))
+    cost30 = sum(costs.get(d, 0.0) for d in window)
+    rows = [row for row in items if row.get('date') in window]
+    requests = sum(int(num(row.get('requests'))) for row in rows)
+    tokens = sum(int(num(row.get('prompt_tokens')) + num(row.get('completion_tokens'))) for row in rows)
+    return [
+        f"L|Last 30 days: {usd(cost30)} · {requests:,} requests · {compact(tokens)} tokens",
+        f"P|orange|{sparkline(costs, today)}|",
+    ]
+
+def model_rows(items, today):
+    """Return the Models H row and up to 3 M rows, or [] when there are no models or items is None.
+
+    Models are ranked by usage over window_dates, highest first, only usage > 0. The
+    name is the part of the model id after the last '/', truncated to 26 characters with a trailing "…".
+    """
+    if items is None:
+        return []
+    window = set(window_dates(today))
+    totals = {}
+    for row in items:
+        model = row.get('model')
+        if row.get('date') in window and isinstance(model, str):
+            totals[model] = totals.get(model, 0.0) + num(row.get('usage'))
+    ranked = sorted((item for item in totals.items() if item[1] > 0), key=lambda item: item[1], reverse=True)[:3]
+    if not ranked:
+        return []
+    rows = ["H|Models"]
+    for model, cost in ranked:
+        name = model.rsplit('/', 1)[-1]
+        if len(name) > 26:
+            name = name[:25] + "…"
+        rows.append(f"M|{name}|{usd(cost)}")
+    return rows
+
+def main():
+    """Print the summary rows: LABEL|… first, then the popup rows.
+
+    When KEY_LABEL is missing from the key list, print LABEL|— and the not-found rows.
+    """
+    keys = load_json(sys.argv[1], dict)
+    activity = activity_items(load_json(sys.argv[2], dict))
+    today = datetime.datetime.now(datetime.timezone.utc).date()
+    label = os.environ.get('KEY_LABEL', '')
+    updated = os.environ.get('UPDATED_TXT', 'recently')
+    entry = key_entry(keys, label)
+    if entry is None:
+        print("LABEL|—")
+        print(f"T|OpenRouter|updated {updated}")
+        print(f"L|key {label} not found")
+        print("S|")
+        print("A|refresh|Refresh Now")
+        print("A|dashboard|Usage Dashboard")
+        return
+    usage_daily = num(entry.get('usage_daily'))
+    byok = num(entry.get('byok_usage_daily'))
+    print(f"LABEL|{usd(usage_daily)}")
+    print(f"T|OpenRouter|updated {updated}")
+    print("H|Today")
+    print(f"L|{usd(usage_daily)} · key {label}")
+    if byok > 0:
+        print(f"L|BYOK: {usd(byok)}")
+    if entry.get('disabled') is True:
+        print("L|key disabled")
+    print("H|Budget")
+    for row in budget_rows(entry):
+        print(row)
+    print("H|Cost")
+    print(f"L|This week: {usd(entry.get('usage_weekly'))} · Month: {usd(entry.get('usage_monthly'))}")
+    print(f"L|All time: {usd(entry.get('usage'))}")
+    for row in activity_rows(activity, today, usage_daily):
+        print(row)
+    for row in model_rows(activity, today):
+        print(row)
+    print("S|")
+    print("A|refresh|Refresh Now")
+    print("A|dashboard|Usage Dashboard")
+
+if __name__ == '__main__':
+    main()
+PY
+)"
+
+LABEL="$(printf '%s\n' "$SUMMARY" | awk -F'\|' '$1=="LABEL"{sub(/^LABEL\|/,""); print; exit}')"
+LABEL="${LABEL:-—}"
+ROWS="$(printf '%s\n' "$SUMMARY" | grep -v '^LABEL|')"
+ROWS="$(printf 'S|\n%s\nS|\n' "$ROWS")"
+sketchybar --set "$NAME" label="$LABEL"
+
+SIG="$(printf '%s\n' "$SUMMARY" | /usr/bin/cksum)"
+if [ "$SIG" = "$(cat "$SIG_CACHE" 2>/dev/null)" ] && sketchybar --query "${NAME}.line.0" >/dev/null 2>&1; then
+  exit 0
+fi
+printf '%s\n' "$SIG" > "$SIG_CACHE"
+
+sketchybar --remove "/${NAME}\\.line\\..*/" 2>/dev/null
+
+color_for() {
+  case "$1" in
+    green) printf '%s' "$GREEN" ;;
+    yellow) printf '%s' "$YELLOW" ;;
+    orange) printf '%s' "$ORANGE" ;;
+    red) printf '%s' "$RED" ;;
+    *) printf '%s' "$GREY" ;;
+  esac
+}
+
+args=()
+i=0
+while IFS= read -r row || [ -n "$row" ]; do
+  [ -z "$row" ] && continue
+  typ="${row%%|*}"
+  rest="${row#*|}"
+  id="${NAME}.line.$i"
+  args+=(
+    --add item "$id" "popup.$NAME"
+    --set "$id"
+      background.drawing=off
+      background.height=20
+      padding_left=8
+      padding_right=8
+      icon.padding_left=0
+      icon.padding_right=0
+  )
+  case "$typ" in
+    S)
+      args+=( icon.drawing=off label.drawing=off )
+      ;;
+    H)
+      args+=(
+        icon.drawing=off
+        label="$rest"
+        label.font="$FONT:Bold:10.0"
+        label.color=$GREY
+        label.padding_left=10
+        label.padding_right=10
+      )
+      ;;
+    L)
+      args+=(
+        icon.drawing=off
+        label="$rest"
+        label.font="$FONT:Regular:11.0"
+        label.color=$WHITE
+        label.padding_left=12
+        label.padding_right=10
+      )
+      ;;
+    M|E)
+      model="${rest%%|*}"
+      cost="${rest#*|}"
+      color=$GREEN
+      [ "$typ" = "E" ] && color=$RED
+      args+=(
+        icon="$model"
+        icon.font="$FONT:Regular:11.0"
+        icon.color=$WHITE
+        icon.align=left
+        icon.width=200
+        icon.padding_left=10
+        icon.padding_right=4
+        label="$cost"
+        label.font="$FONT:Bold:11.0"
+        label.color=$color
+        label.padding_left=4
+        label.padding_right=10
+      )
+      ;;
+    T)
+      tleft="${rest%%|*}"
+      tright="${rest#*|}"
+      args+=(
+        icon="$tleft"
+        icon.font="$FONT:Bold:14.0"
+        icon.color=$WHITE
+        icon.padding_left=10
+        icon.padding_right=4
+        label="$tright"
+        label.font="$FONT:Regular:11.0"
+        label.color=$GREY
+        label.padding_left=4
+        label.padding_right=10
+      )
+      ;;
+    R)
+      rleft="${rest%%|*}"
+      rright="${rest#*|}"
+      args+=(
+        icon="$rleft"
+        icon.font="$FONT:Regular:11.0"
+        icon.color=$WHITE
+        icon.padding_left=12
+        icon.padding_right=4
+        label="$rright"
+        label.font="$FONT:Regular:11.0"
+        label.color=$GREY
+        label.padding_left=4
+        label.padding_right=10
+      )
+      ;;
+    A)
+      kind="${rest%%|*}"
+      atext="${rest#*|}"
+      case "$kind" in
+        refresh) aglyph=""; aclick="$PLUGIN_DIR/ai_usage.sh" ;;
+        dashboard) aglyph=""; aclick="open $DASH_URL" ;;
+        *) aglyph="•"; aclick="true" ;;
+      esac
+      args+=(
+        icon="$aglyph"
+        icon.font="$FONT:Regular:12.0"
+        icon.color=$GREY
+        icon.padding_left=12
+        icon.padding_right=6
+        label="$atext"
+        label.font="$FONT:Regular:12.0"
+        label.color=$WHITE
+        label.padding_left=2
+        label.padding_right=10
+        click_script="$aclick"
+      )
+      ;;
+    P)
+      bar_color="$(color_for "${rest%%|*}")"
+      bars="${rest#*|}"
+      filled="${bars%%|*}"
+      empty="${bars#*|}"
+      args+=(
+        icon="$filled"
+        icon.font="$FONT:Regular:12.0"
+        icon.color="$bar_color"
+        icon.padding_left=12
+        icon.padding_right=0
+        label="$empty"
+        label.font="$FONT:Regular:12.0"
+        label.color=$TRACK
+        label.padding_left=0
+        label.padding_right=10
+      )
+      ;;
+  esac
+  i=$((i + 1))
+done <<< "$ROWS"
+
+if [ ${#args[@]} -gt 0 ]; then
+  sketchybar "${args[@]}" --set "$NAME" popup.drawing=off
+fi

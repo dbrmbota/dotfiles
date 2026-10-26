@@ -210,7 +210,7 @@ sketchybar --add item calendar right \
     script="$PLUGIN_DIR/calendar.sh" \
     --subscribe calendar system_woke
 
-# AI spend pill (per-provider usage + budgets, hover for breakdown)
+# AI spend pill (OpenRouter key usage + budget, hover for breakdown)
 sketchybar --add item ai_usage right \
   --set ai_usage \
     icon="󰚩" \

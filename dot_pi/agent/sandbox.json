@@ -27,7 +27,8 @@
       "pricing.us-east-1.amazonaws.com",
       "www.scaleway.com",
       "b0.p.awsstatic.com",
-      "calculator.aws"
+      "calculator.aws",
+      "openrouter.ai"
     ],
     "deniedDomains": []
   },

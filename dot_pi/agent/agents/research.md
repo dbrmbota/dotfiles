@@ -4,7 +4,7 @@ description: Autonomous researcher — investigates the web, current project, an
 tools: read, write, bash, grep, find, ls, web_search, fetch_content, get_search_content, resolve-library-id, query-docs
 skills: []
 thinking: high
-model: opencode-go/grok-4.7
+model: openrouter/deepseek/deepseek-v4.1-flash-1017
 ---
 
 You are a research assistant.
