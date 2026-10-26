@@ -17,42 +17,48 @@
     "bottom": 40
   },
   "resize_delta": 100,
-  "ignore_rules": [],
+  "ignore_rules": [
+    {
+      "kind": "Exe",
+      "id": "^Control Cent(er|re)$",
+      "matching_strategy": "Regex"
+    }
+  ],
   "floating_applications": [],
   "manage_rules": [],
   "monitors": [
     {
       "workspaces": [
         {
-          "name": "I",
+          "name": "1",
           "layout": "BSP"
         },
         {
-          "name": "II",
+          "name": "2",
           "layout": "BSP"
         },
         {
-          "name": "III",
+          "name": "3",
           "layout": "BSP"
         },
         {
-          "name": "IV",
+          "name": "4",
           "layout": "BSP"
         },
         {
-          "name": "V",
+          "name": "5",
           "layout": "BSP"
         },
         {
-          "name": "VI",
+          "name": "6",
           "layout": "BSP"
         },
         {
-          "name": "VII",
+          "name": "7",
           "layout": "BSP"
         },
         {
-          "name": "VIII",
+          "name": "8",
           "layout": "BSP"
         }
       ]
