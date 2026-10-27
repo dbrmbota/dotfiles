@@ -12,9 +12,9 @@
   "floating_layer_behaviour": "Float",
   "global_work_area_offset": {
     "left": 0,
-    "top": 40,
+    "top": 0,
     "right": 0,
-    "bottom": 40
+    "bottom": 0
   },
   "resize_delta": 100,
   "ignore_rules": [
