@@ -1,0 +1,91 @@
+{
+  "profile": {
+    "id": "openrouter-key",
+    "name": "OpenRouter",
+    "links": { "dashboard": "https://openrouter.ai/activity" },
+    "look": {
+      "symbol": "arrow.triangle.branch",
+      "color": { "light": [0.49, 0.49, 1.0], "dark": [0.62, 0.62, 1.0] }
+    }
+  },
+  "settings": [
+    { "id": "managementKey", "label": "Management key", "kind": "secret", "scope": "account" },
+    { "id": "keyLabel", "label": "Tracked key label", "default": "sk-or-v1-cca...99a",
+      "helpText": "Masked label of the key to track, as shown in the OpenRouter key list." }
+  ],
+  "defaultDataSource": "usage",
+  "dataSources": [
+    {
+      "kind": "usage",
+      "label": "API",
+      "summary": "Key cap, spend windows, today's spend",
+      "credential": { "setting": "managementKey" },
+      "fetch": {
+        "script": {
+          "run": "./probe.sh",
+          "folder": "{{ .chezmoi.homeDir }}/.claudebar/bin/openrouter-key",
+          "environment": { "CLAUDEBAR_KEY_LABEL": "{{ "{{setting.keyLabel}}" }}" },
+          "secrets": { "CLAUDEBAR_MANAGEMENT_KEY": "managementKey" },
+          "timeout": 90
+        }
+      },
+      "mapping": {
+        "json": {
+          "quotas": [
+            {
+              "kind": "time",
+              "each": "$.caps",
+              "name": { "firstOf": ["name"] },
+              "left": { "money": "remaining", "of": "limit", "currency": "USD" },
+              "resetsAt": { "iso8601": "resets_at" },
+              "window": { "seconds": "window_seconds" }
+            },
+            {
+              "kind": "time",
+              "name": "Credits",
+              "left": { "money": "$.credits_remaining", "currency": "USD" },
+              "resetText": "Auto top-up: +$100 below $10"
+            }
+          ],
+          "notAnObject": "OpenRouter probe printed no JSON object"
+        }
+      },
+      "errors": {
+        "cli.nonzero": {
+          "executionFailed": "OpenRouter probe failed — see ~/Library/Caches/claudebar-openrouter-key/probe.log"
+        }
+      },
+      "cache": { "ttl": 60 }
+    }
+  ],
+  "usageHistory": {
+    "records": {
+      "command": {
+        "cli": "{{ .chezmoi.homeDir }}/.claudebar/bin/openrouter-key/probe.sh",
+        "args": ["history"],
+        "timeout": 85
+      },
+      "shapes": [
+        {
+          "where": { "path": "$.kind", "equals": "activity" },
+          "at": { "field": "$.date", "format": "yyyy-MM-dd", "timeZone": "UTC" },
+          "id": ["$.date", "$.model"],
+          "model": "$.model",
+          "tokens": {
+            "input": "$.prompt_tokens",
+            "output": "$.completion_tokens",
+            "cacheRead": "$.cached_tokens",
+            "inputIncludesCacheRead": true
+          },
+          "cost": "$.usage"
+        },
+        {
+          "where": { "path": "$.kind", "equals": "partial" },
+          "at": { "field": "$.date", "format": "yyyy-MM-dd", "timeZone": "UTC" },
+          "id": ["$.date", "$.kind"],
+          "cost": "$.usage"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "alerts" : {
+    "recapSentAt" : 1793131541.3807669
+  },
+  "alibaba" : {
+    "plainLoginEnabled" : true
+  },
+  "ampcode" : {
+    "plainLoginEnabled" : true
+  },
+  "antigravity" : {
+    "plainLoginEnabled" : true
+  },
+  "app" : {
+    "menuBarAdditionalProviderIds" : [
+
+    ],
+    "menuBarPercentageEnabled" : true,
+    "menuBarPercentageProviderId" : "openrouter-key",
+    "menuBarPercentageQuotaKey" : "",
+    "menuBarProviderLogoEnabled" : true,
+    "menuBarProviderSettings" : {
+      "claude" : {
+        "primaryQuotaKey" : "session",
+        "secondaryQuotaKey" : "",
+        "stacked" : false,
+        "stackedSize" : "small"
+      },
+      "openrouter" : {
+        "primaryQuotaKey" : "",
+        "secondaryQuotaKey" : "",
+        "stacked" : false,
+        "stackedSize" : "small"
+      }
+    },
+    "menuBarSecondaryQuotaKey" : "",
+    "menuBarStackedEnabled" : false,
+    "menuBarStackedSize" : "small",
+    "nativeMenuBarIconsEnabled" : true,
+    "popoverTitle" : "TheOrian Solutions",
+    "themeMode" : "system",
+    "usageDisplayMode" : "used",
+    "userHasChosenTheme" : true
+  },
+  "bedrock" : {
+    "plainLoginEnabled" : true
+  },
+  "claude" : {
+    "plainLoginEnabled" : true
+  },
+  "cline" : {
+    "plainLoginEnabled" : true
+  },
+  "cloudflare-ai" : {
+    "plainLoginEnabled" : true
+  },
+  "codex" : {
+    "plainLoginEnabled" : true
+  },
+  "commandcode" : {
+    "plainLoginEnabled" : true
+  },
+  "copilot" : {
+    "plainLoginEnabled" : true
+  },
+  "cursor" : {
+    "plainLoginEnabled" : true
+  },
+  "deepseek" : {
+    "plainLoginEnabled" : true
+  },
+  "devin" : {
+    "plainLoginEnabled" : true
+  },
+  "gemini" : {
+    "plainLoginEnabled" : true
+  },
+  "grok" : {
+    "plainLoginEnabled" : true
+  },
+  "jetbrains" : {
+    "plainLoginEnabled" : true
+  },
+  "kimi" : {
+    "plainLoginEnabled" : true
+  },
+  "kiro" : {
+    "plainLoginEnabled" : true
+  },
+  "minimax" : {
+    "plainLoginEnabled" : true
+  },
+  "mistral" : {
+    "plainLoginEnabled" : true
+  },
+  "omp" : {
+    "plainLoginEnabled" : true
+  },
+  "openai" : {
+    "plainLoginEnabled" : true
+  },
+  "opencode-go" : {
+    "plainLoginEnabled" : true
+  },
+  "openrouter" : {
+    "plainLoginEnabled" : true
+  },
+  "openrouter-key" : {
+    "plainLoginEnabled" : true
+  },
+  "providers" : {
+    "ampcode" : {
+      "isEnabled" : false
+    },
+    "antigravity" : {
+      "isEnabled" : false
+    },
+    "claude" : {
+      "isEnabled" : false
+    },
+    "codex" : {
+      "isEnabled" : false
+    },
+    "commandcode" : {
+      "isEnabled" : false
+    },
+    "cursor" : {
+      "isEnabled" : false
+    },
+    "gemini" : {
+      "isEnabled" : false
+    },
+    "grok" : {
+      "isEnabled" : false
+    },
+    "kimi" : {
+      "isEnabled" : false
+    },
+    "kiro" : {
+      "isEnabled" : false
+    },
+    "omp" : {
+      "isEnabled" : false
+    },
+    "opencode-go" : {
+      "isEnabled" : false
+    },
+    "openrouter" : {
+      "isEnabled" : false
+    },
+    "openrouter-key" : {
+      "isEnabled" : true
+    },
+    "order" : [
+      "claude",
+      "codex",
+      "gemini",
+      "antigravity",
+      "zai",
+      "copilot",
+      "openrouter",
+      "openrouter-key",
+      "bedrock",
+      "ampcode",
+      "kimi",
+      "kiro",
+      "cursor",
+      "minimax",
+      "deepseek",
+      "vercel-gateway",
+      "alibaba",
+      "mistral",
+      "opencode-go",
+      "omp",
+      "grok",
+      "commandcode",
+      "cline",
+      "warp",
+      "devin",
+      "windsurf",
+      "jetbrains",
+      "openai",
+      "cloudflare-ai"
+    ],
+    "zai" : {
+      "isEnabled" : false
+    }
+  },
+  "vercel-gateway" : {
+    "plainLoginEnabled" : true
+  },
+  "warp" : {
+    "plainLoginEnabled" : true
+  },
+  "windsurf" : {
+    "plainLoginEnabled" : true
+  },
+  "zai" : {
+    "plainLoginEnabled" : true
+  }
+}
