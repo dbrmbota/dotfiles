@@ -28,7 +28,8 @@
       "www.scaleway.com",
       "b0.p.awsstatic.com",
       "calculator.aws",
-      "openrouter.ai"
+      "openrouter.ai",
+      "developer.apple.com"
     ],
     "deniedDomains": []
   },
