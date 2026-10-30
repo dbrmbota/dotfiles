@@ -29,7 +29,7 @@
     "ctrl-b b": "layout.toggle:sidebar",
     "ctrl-b ?": "app.help",
     "ctrl-b s": "app.settings",
-    "ctrl-b g": "mod.open:picker",
+    "ctrl-b g": "mod.open:tab-picker",
     "ctrl-b shift-n": "space.new",
     "ctrl-b shift-w": "space.rename",
     "ctrl-b shift-d": "space.close",
