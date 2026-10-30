@@ -35,6 +35,47 @@ function spaceColor(t, p) {
   return c.startsWith("#") ? c : (MARK[c] ?? t[c]);
 }
 
+// Vendored from Herdr's command palette: frame/palette/main.js:113 (Herdr 0.1.9).
+// Reuse, not a fork: resync by diffing this block against that file after a
+// Herdr upgrade. Emoji/astral name matching is intentionally out of scope.
+// Fuzzy score of `q` in `text`, with the matched positions; null: no match.
+function fuzzy(q, text) {
+  const t = text.toLowerCase();
+  let score = 0;
+  let at = 0;
+  let run = 0;
+  const hits = [];
+  for (const ch of q) {
+    const i = t.indexOf(ch, at);
+    if (i < 0) return null;
+    const start = i === 0 || /[\s:.\-_/]/.test(t[i - 1]);
+    run = i === at && hits.length ? run + 1 : 0;
+    score += 1 + (start ? 6 : 0) + run * 3 - Math.min(i - at, 6) * 0.3;
+    hits.push(i);
+    at = i + 1;
+  }
+  return { score: score - text.length * 0.02, hits };
+}
+
+// Label text with the hit characters in accent and semibold. From frame/palette/main.js:187 title(), without the "on" parameter.
+function highlight(t, text, hits) {
+  if (!hits?.length) return div().text_color(t.foreground).child(text);
+  const parts = [];
+  let cur = "";
+  let lit = false;
+  [...text].forEach((ch, i) => {
+    const h = hits.includes(i);
+    if (h !== lit && cur) {
+      parts.push([cur, lit]);
+      cur = "";
+    }
+    lit = h;
+    cur += ch;
+  });
+  if (cur) parts.push([cur, lit]);
+  return h_flex().flex_1().min_w(0).overflow_hidden().children(parts.map(([s, h]) => div().text_color(h ? t.accent : t.foreground).when(h, (d) => d.font_semibold()).child(s.replace(/ /g, "\u00a0"))));
+}
+
 export default class Picker extends View {
   init(_props, cx) {
     this.filter = "";
@@ -61,7 +102,7 @@ export default class Picker extends View {
   }
 
   rows() {
-    const f = this.filter.toLowerCase();
+    const q = this.filter.trim().toLowerCase().replace(/\s+/g, "");
     const all = agents();
     const tabPanes = panes();
     const leads = shared("auto-name-tabs.lead") ?? {};
@@ -72,27 +113,43 @@ export default class Picker extends View {
       addrs.forEach(walk);
       return n;
     };
-    const groups = spaces().map((w) => {
-      const ctxs = w.tabs
-        .map((ctx) => {
+    const ws = spaces();
+    const tabs = ws
+      .flatMap((w) =>
+        w.tabs.map((ctx) => {
           const mine = all.filter((a) => a.tab === ctx.id);
           return { w, ctx, mine, label: tabLabel(ctx, tabPanes, leads, home()), team: teamOf(mine.map((a) => a.address)) };
-        })
-        .filter((c) => !f || [w.name, c.label, c.ctx.name, ...c.mine.map((a) => a.program?.name ?? "")].join(" ").toLowerCase().includes(f));
-      return { w, ctxs };
-    });
-    const busy = groups.filter((p) => p.w.status && p.ctxs.length);
-    const quiet = groups.filter((p) => !p.w.status && p.ctxs.length);
-    busy.sort((a, b) => (b.w.status === "blocked") - (a.w.status === "blocked"));
+        }),
+      )
+      .map((c, i) => ({ ...c, i }));
     const out = [];
-    const add = (p) => {
-      out.push({ kind: "head", w: p.w });
-      for (const c of p.ctxs) out.push({ kind: "ctx", ...c });
-    };
-    busy.forEach(add);
-    if (quiet.length) {
-      out.push({ kind: "earlier", count: quiet.length });
-      if (this.showEarlier || f) quiet.forEach(add);
+    if (q) {
+      const pref = (c) => (c.ctx.status === "blocked" || c.ctx.status === "done" ? 0 : c.w.active && c.ctx.active ? 1 : 2);
+      out.push(
+        ...tabs
+          .flatMap((c) => {
+            const { w, ctx, mine, label } = c;
+            const titleHit = fuzzy(q, label);
+            const moreHit = fuzzy(q, `${w.name} ${label} ${ctx.name} ${mine.map((a) => a.program?.name ?? "").join(" ")}`);
+            const best = titleHit ?? (moreHit && { score: moreHit.score - 4, hits: [] });
+            return best ? [{ kind: "ctx", ...c, score: best.score, hits: best.hits, ranked: true }] : [];
+          })
+          .sort((a, b) => b.score - a.score || pref(a) - pref(b) || a.i - b.i),
+      );
+    } else {
+      const groups = ws.map((w) => ({ w, ctxs: tabs.filter((c) => c.w === w) }));
+      const busy = groups.filter((p) => p.w.status && p.ctxs.length);
+      const quiet = groups.filter((p) => !p.w.status && p.ctxs.length);
+      busy.sort((a, b) => (b.w.status === "blocked") - (a.w.status === "blocked"));
+      const add = (p) => {
+        out.push({ kind: "head", w: p.w });
+        for (const c of p.ctxs) out.push({ kind: "ctx", ...c });
+      };
+      busy.forEach(add);
+      if (quiet.length) {
+        out.push({ kind: "earlier", count: quiet.length });
+        if (this.showEarlier) quiet.forEach(add);
+      }
     }
     out.push({ kind: "new" });
     out.push({ kind: "space", machine: null });
@@ -189,9 +246,10 @@ export default class Picker extends View {
         .hover((s) => s.bg(t.hover))
         .on_click(() => this.go(r))
         .child(this.glyph(t, r.ctx.status))
-        .child(div().flex_1().truncate().text_color(t.foreground).when(here, (d) => d.font_semibold()).child(r.label))
+        .child(r.hits?.length ? highlight(t, r.label, r.hits).when(here, (d) => d.font_semibold()) : div().flex_1().truncate().text_color(t.foreground).when(here, (d) => d.font_semibold()).child(r.label))
         .when(r.ctx.status === "blocked", (el) => el.child(div().text_size(11).text_color(t.blocked).child("needs you")))
         .when(r.ctx.status === "done", (el) => el.child(div().text_size(11).text_color(t.done).child("finished")))
+        .when(r.ranked, (el) => el.child(h_flex().flex_none().gap(6).items_center().child(div().size(6).rounded_full().bg(spaceColor(t, r.w))).child(div().text_size(11).text_color(t.dim).child(r.w.name))))
         .child(div().text_size(11).text_color(t.dim).child(who + (r.team ? `  +${r.team}` : "")));
     };
 
