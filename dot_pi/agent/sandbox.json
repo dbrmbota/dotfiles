@@ -67,7 +67,8 @@
       "~/.pi/agent/keybindings.json",
       "~/.pi/agent/sandbox.json",
       "/opt/homebrew/Cellar/pi-coding-agent",
-      "/home/linuxbrew/.linuxbrew/Cellar/pi-coding-agent"
+      "/home/linuxbrew/.linuxbrew/Cellar/pi-coding-agent",
+      "/Users/dbrmbota/.config/herdr-app/AGENTS.md"
     ],
     "denyRead": [
       "~/.ssh",
