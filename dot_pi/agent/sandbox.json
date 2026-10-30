@@ -29,7 +29,8 @@
       "b0.p.awsstatic.com",
       "calculator.aws",
       "openrouter.ai",
-      "developer.apple.com"
+      "developer.apple.com",
+      "herdr.dev"
     ],
     "deniedDomains": []
   },
