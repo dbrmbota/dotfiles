@@ -76,15 +76,41 @@
       "type": "column",
       "children": [
         {
-          "id": "tabs",
-          "type": "block",
-          "content": {
-            "mod": "auto-name-tabs"
-          },
+          "id": "tabs-row",
+          "type": "row",
+          "children": [
+            {
+              "id": "tabs",
+              "type": "block",
+              "content": {
+                "mod": "auto-name-tabs"
+              },
+              "size": {
+                "weight": 1
+              },
+              "window_drag": true
+            },
+            {
+              "id": "docs-button",
+              "type": "block",
+              "content": {
+                "mod": "markdown-viewer",
+                "props": {
+                  "button": true,
+                  "panel": "panel",
+                  "stack": "panel-body",
+                  "child": "markdown"
+                }
+              },
+              "size": {
+                "px": 80
+              },
+              "window_drag": true
+            }
+          ],
           "size": {
             "px": 42
-          },
-          "window_drag": true
+          }
         },
         {
           "id": "work-body",
@@ -139,6 +165,18 @@
                       "type": "block",
                       "content": {
                         "mod": "changes"
+                      }
+                    },
+                    {
+                      "id": "markdown",
+                      "type": "block",
+                      "content": {
+                        "mod": "markdown-viewer",
+                        "props": {
+                          "panel": "panel",
+                          "stack": "panel-body",
+                          "child": "markdown"
+                        }
                       }
                     }
                   ],
