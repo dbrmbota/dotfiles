@@ -4,7 +4,7 @@
 
 ## Requirements
 
-- `tuicr` on your `PATH`.
+- `tuicr` on your `PATH` (≥ 0.28 to close rounds without comments).
 - omp-undo-redo installed and recording snapshots for pi sessions.
 - The current directory is inside a git repository.
 - pi runs in the interactive TUI. `/review` does not work in print or RPC mode.
@@ -14,10 +14,10 @@
 ## How a review round works
 
 - **First round in a session:** the review covers the whole session. It starts at the earliest surviving "before" snapshot and ends at the latest "after" snapshot.
-- **Later rounds:** the review starts at the commit of the last exported round. It shows only the new changes.
+- **Later rounds:** the review starts at the commit of the last reviewed round. It shows only the new changes.
 - **`/undo`:** the end of the review follows the current snapshot, so undone turns are left out.
-- **Only an export counts.** Press `y` in tuicr to export. The round is then marked as reviewed. Pressing `q` exports nothing, so the round is not marked. Running `/review` again reopens the same changes, with your comments still there.
-- **Approve without comments:** write a short comment such as "LGTM" and export.
+- **Only an export or a clean close counts.** Press `y` in tuicr to export. The round is then marked as reviewed. Quitting with `:q` (bare `q` no longer quits in tuicr 0.28) exports nothing, so the round is not marked. Running `/review` again reopens the same changes, with your comments still there. The one exception is the next bullet.
+- **Approve without comments:** mark every file reviewed with `r`, add no comments, and quit with `:q`. The round is marked reviewed and nothing is pasted. This needs tuicr ≥ 0.28, which prints the exit summary. Older versions keep the old behavior (no marker).
 - **Nothing new:** if the snapshots are identical, `/review` says "nothing to review since …" and stops.
 
 After an export, the text is pasted into the editor. Press Enter to send it to the agent.
@@ -41,7 +41,7 @@ There is no time limit on the wait.
 ## What it leaves behind
 
 - **Pack files and dangling commits:** each round adds a pack and a review commit to the repository's object database. No branch or tag points to them. `git gc` removes them after `gc.pruneExpire`.
-- **Session entries:** each exported round adds a `turn-review` entry to the pi session. These entries belong to the current branch, so `/tree` and forks behave as expected.
+- **Session entries:** each reviewed round adds a `turn-review` entry to the pi session. These entries belong to the current branch, so `/tree` and forks behave as expected.
 - **tuicr sessions:** tuicr keeps its own session data. You can resume a round from tuicr's Sessions tab.
 
 ## What it does not change

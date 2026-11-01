@@ -1,8 +1,9 @@
 /**
  * state — the "last reviewed" marker stored in the pi session.
  *
- * `/review` appends one custom entry per exported round. The latest valid marker
- * on the current branch gives the base for the next round. The branch scope means
+ * `/review` appends one custom entry per round marked reviewed (exported, or closed
+ * with no comments). The latest valid marker on the current branch gives the base for
+ * the next round. The branch scope means
  * `/tree` navigation and forks behave naturally. This module never imports pi
  * packages, so it can be unit-tested with `node --test`.
  */
@@ -21,7 +22,7 @@ export interface ReviewMarker {
 	reviewCommit: string;
 	/** tuicr session slug, when tuicr reported one. */
 	slug?: string;
-	/** ISO timestamp of the export. */
+	/** ISO timestamp of when the round was marked reviewed. */
 	at: string;
 }
 

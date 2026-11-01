@@ -4,12 +4,13 @@
  * `/review` takes no arguments. It waits until omp-undo-redo has recorded the last
  * turn, then diffs the previous review (or the session's first snapshot) against
  * the latest omp `after` snapshot. It runs tuicr full screen in the same terminal
- * and pastes a `y` export into the editor. Only an export marks the round as
- * reviewed. The readiness check matches omp's checkpoint `parentLeafId` against the
- * leaf read in `before_agent_start`. This assumes no extension appends session
- * entries inside `before_agent_start`. If that is violated, the cost is a spurious
+ * and pastes a `y` export into the editor. An export, or a clean exit with every file
+ * marked reviewed and no comments, marks the round as reviewed. The readiness check
+ * matches omp's checkpoint `parentLeafId` against the leaf read in
+ * `before_agent_start`. This assumes no extension appends session entries inside
+ * `before_agent_start`. If that is violated, the cost is a spurious
  * wait that Esc dismisses, never a wrong diff. Pi-free logic lives in `omp.ts`,
- * `git.ts`, and `state.ts`.
+ * `git.ts`, `state.ts`, and `tuicr.ts`.
  */
 
 import { spawnSync } from "node:child_process";
@@ -35,6 +36,7 @@ import {
 	type PendingTurn,
 } from "./omp.ts";
 import { CUSTOM_TYPE, latestMarker } from "./state.ts";
+import { isMarkerLine, isReviewedClean, parseSlug, parseSummary, type TuicrSummary } from "./tuicr.ts";
 
 /** Readiness state for the agent turn that is in flight or just finished in this process. */
 let pending: PendingTurn | undefined;
@@ -153,6 +155,10 @@ async function handleReview(pi: ExtensionAPI, _args: string, ctx: ExtensionComma
 		}
 
 		if (result.stdout.trim() === "") {
+			if (isReviewedClean(result.summary)) {
+				pi.appendEntry(CUSTOM_TYPE, { v: 1, base, head, reviewCommit, slug: result.slug, at: new Date().toISOString() });
+				return notify("marked reviewed — no comments", "info");
+			}
 			return notify("no export; round not marked reviewed — /review reopens it", "info");
 		}
 		ctx.ui.pasteToEditor(result.stdout.trimEnd());
@@ -224,12 +230,14 @@ async function confirmReviewPrevious(ctx: ExtensionCommandContext): Promise<bool
 
 /** Outcome of one tuicr run. */
 interface TuicrResult {
-	/** Export text printed by tuicr on `y`, empty on `q`. */
+	/** Export text printed by tuicr on `y`, empty when tuicr quit without exporting (`:q`). */
 	stdout: string;
-	/** Last lines of stderr, excluding `tuicr-session:` lines. */
+	/** Last lines of stderr, excluding `tuicr-session:` and `tuicr-summary:` lines. */
 	stderrTail: string;
 	/** Session slug parsed from `tuicr-session: <slug>` on stderr. */
 	slug?: string;
+	/** Counts from the `tuicr-summary:` line on stderr, undefined when tuicr printed none. */
+	summary?: TuicrSummary;
 	/** Process exit status, or null when it did not exit normally. */
 	status: number | null;
 	/** Spawn error, such as ENOENT when tuicr is not on PATH. */
@@ -261,21 +269,17 @@ async function runTuicr(
 		const stderr = child.stderr ?? "";
 		const stderrTail = stderr
 			.split("\n")
-			.filter((line) => line.trim() !== "" && !line.startsWith("tuicr-session:"))
+			.filter((line) => line.trim() !== "" && !isMarkerLine(line))
 			.slice(-5)
 			.join("\n");
 		done({
 			stdout: child.stdout ?? "",
 			stderrTail,
 			slug: parseSlug(stderr),
+			summary: parseSummary(stderr),
 			status: child.status,
 			spawnErrorCode: (child.error as NodeJS.ErrnoException | undefined)?.code,
 		});
 		return { render: () => [], invalidate: () => {} };
 	});
-}
-
-/** Parses the session slug from tuicr stderr. Returns undefined when no `tuicr-session:` line exists. */
-function parseSlug(stderr: string): string | undefined {
-	return /^tuicr-session: (.+)$/m.exec(stderr)?.[1]?.trim();
 }
