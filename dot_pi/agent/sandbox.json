@@ -30,7 +30,8 @@
       "calculator.aws",
       "openrouter.ai",
       "developer.apple.com",
-      "herdr.dev"
+      "herdr.dev",
+      "www.w3.org"
     ],
     "deniedDomains": []
   },
