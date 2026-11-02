@@ -38,7 +38,7 @@ export interface AppliedCompletion {
 export type StorableType = "task" | "report";
 
 /**
- * Parse a `/artifact edit` or `/artifact delete` argument. Accepts `@type:name`
+ * Parse a `/artifact edit`, `/artifact delete`, or `/artifact show` argument. Accepts `@type:name`
  * (the canonical form that autocomplete inserts) and bare `type:name`. Returns
  * undefined for an unknown type, an invalid name, or anything else.
  */
@@ -50,6 +50,17 @@ export function parseArtifactArg(arg: string): { type: ArtifactType; name: strin
 	const name = body.slice(colon + 1);
 	if (!type || !ARTIFACT_NAME_RE.test(name)) return undefined;
 	return { type, name };
+}
+
+/** Herdr label key prefix that the markdown viewer watches for show requests. */
+export const SHOW_LABEL_PREFIX = "markdown.show.";
+
+/**
+ * Build the Herdr label `markdown.show.<id>=<path>` that asks the viewer to open
+ * the artifact file at the absolute `path`. `id` is unique per request.
+ */
+export function buildShowLabel(id: string, path: string): string {
+	return `${SHOW_LABEL_PREFIX}${id}=${path}`;
 }
 
 /**
@@ -150,9 +161,9 @@ export function applyRefCompletion(
 }
 
 /**
- * Complete `/artifact` arguments. The first word completes to `edit` or `delete`.
- * After either, every artifact is offered as `@type:name`, fuzzy-matched against
- * `type:name`. Item values carry the full argument text (`edit @plan:foo`).
+ * Complete `/artifact` arguments. The first word completes to `edit`, `delete`,
+ * or `show`. After any of them, every artifact is offered as `@type:name`, fuzzy-matched
+ * against `type:name`. Item values carry the full argument text (`show @plan:foo`).
  */
 export function completeArtifactArgs(
 	argumentPrefix: string,
@@ -162,10 +173,10 @@ export function completeArtifactArgs(
 	const parts = argumentPrefix.split(/\s+/);
 	if (parts.length <= 1) {
 		const first = parts[0] ?? "";
-		return ["edit", "delete"].filter((sub) => sub.startsWith(first)).map((sub) => ({ value: sub, label: sub }));
+		return ["edit", "delete", "show"].filter((sub) => sub.startsWith(first)).map((sub) => ({ value: sub, label: sub }));
 	}
 	const [sub, ...rest] = parts;
-	if (sub !== "edit" && sub !== "delete") return [];
+	if (sub !== "edit" && sub !== "delete" && sub !== "show") return [];
 	const query = rest.join(" ").replace(/^@/, "");
 	const candidates = query ? fuzzy(entries, query, (entry) => `${entry.type}:${entry.name}`) : entries;
 	return candidates.map((entry) => ({

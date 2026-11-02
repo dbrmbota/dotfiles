@@ -2,7 +2,7 @@
  * artifacts — markdown handoff files (task, plan, report) per project.
  *
  * Pi wiring only: the `/task` and `/report` commands ask the active agent to
- * save an artifact with its `write` tool, `/artifact` edits, deletes, and
+ * save an artifact with its `write` tool, `/artifact` edits, deletes, shows, and
  * picks artifacts, the `@task:` / `@plan:` / `@report:` autocomplete and the
  * `input` handler replace references with absolute paths, and the project's
  * artifact directory is published as `ARTIFACTS_PATH` over `agents:vars`.
@@ -19,6 +19,7 @@ import {
 	applyRefCompletion,
 	buildRefHint,
 	buildRefSuggestions,
+	buildShowLabel,
 	buildStorePrompt,
 	completeArtifactArgs,
 	extractRefToken,
@@ -40,7 +41,7 @@ import {
 } from "./store.ts";
 
 /** Usage line for `/artifact` when the arguments are not understood. */
-const ARTIFACT_USAGE = "Usage: /artifact [edit|delete @type:name]";
+const ARTIFACT_USAGE = "Usage: /artifact [edit|delete|show @type:name]";
 
 /** Path of the artifact `@type:name` when that file exists under `projectDir`, else undefined. */
 function resolveRefPath(projectDir: string, type: ArtifactType, name: string): string | undefined {
@@ -133,11 +134,12 @@ function runStoreCommand(
 }
 
 /**
- * Run `/artifact`. With no arguments, open the picker. With `edit` or `delete`
- * and an `@type:name` argument, edit or delete that artifact. Other input
+ * Run `/artifact`. With no arguments, open the picker. With `edit`, `delete`, or `show`
+ * and an `@type:name` argument, edit, delete, or show that artifact. Other input
  * prints the usage line or the unknown name.
  */
 async function runArtifactCommand(
+	pi: ExtensionAPI,
 	args: string,
 	ctx: ExtensionCommandContext,
 	projectDir: string | null,
@@ -159,15 +161,17 @@ async function runArtifactCommand(
 		}
 		const picked = await pickArtifact(ctx, entries);
 		if (!picked) return;
-		const action = await ctx.ui.select(`${picked.type}:${picked.name}`, ["Insert reference", "Edit", "Delete"]);
+		const actions = ["Insert reference", ...(process.env.HC_TERMINAL_ID ? ["Show in Herdr"] : []), "Edit", "Delete"];
+		const action = await ctx.ui.select(`${picked.type}:${picked.name}`, actions);
 		if (action === "Insert reference") ctx.ui.pasteToEditor(`@${picked.type}:${picked.name} `);
+		else if (action === "Show in Herdr") await showArtifact(pi, ctx, picked);
 		else if (action === "Edit") await editArtifact(ctx, picked);
 		else if (action === "Delete") await removeArtifact(ctx, picked);
 		return;
 	}
 	const [sub, ...rest] = trimmed.split(/\s+/);
 	const ref = parseArtifactArg(rest.join(" "));
-	if ((sub !== "edit" && sub !== "delete") || !ref) {
+	if ((sub !== "edit" && sub !== "delete" && sub !== "show") || !ref) {
 		ctx.ui.notify(ARTIFACT_USAGE, "info");
 		return;
 	}
@@ -177,6 +181,7 @@ async function runArtifactCommand(
 		return;
 	}
 	if (sub === "edit") await editArtifact(ctx, entry);
+	else if (sub === "show") await showArtifact(pi, ctx, entry);
 	else await removeArtifact(ctx, entry);
 }
 
@@ -214,6 +219,32 @@ async function removeArtifact(ctx: ExtensionCommandContext, entry: ArtifactEntry
 	if (!confirmed) return;
 	deleteArtifact(entry.path);
 	ctx.ui.notify(`Deleted ${entry.type}:${entry.name}`, "info");
+}
+
+/**
+ * Ask the Herdr terminal that runs pi to open `entry` in its markdown viewer. Sets a
+ * unique `markdown.show.<id>` label on that terminal to the artifact's absolute path,
+ * then returns without waiting. Nothing is reported back by the viewer. Notifies an
+ * error outside a Herdr terminal, when `hc` exits nonzero, or when `hc` is missing.
+ */
+async function showArtifact(pi: ExtensionAPI, ctx: ExtensionCommandContext, entry: ArtifactEntry): Promise<void> {
+	const terminalId = process.env.HC_TERMINAL_ID;
+	if (!terminalId) {
+		ctx.ui.notify("/artifact show needs a Herdr terminal", "error");
+		return;
+	}
+	const suffix = Array.from({ length: 4 }, () => Math.floor(Math.random() * 36).toString(36)).join("");
+	const id = `${Date.now().toString(36)}${suffix}`;
+	const result = await pi.exec("hc", ["label", terminalId, buildShowLabel(id, entry.path)], { timeout: 5000 }).catch(() => undefined);
+	if (!result) {
+		ctx.ui.notify("hc not found", "error");
+		return;
+	}
+	if (result.code !== 0) {
+		ctx.ui.notify(result.stderr.trim(), "error");
+		return;
+	}
+	ctx.ui.notify(`Showing ${entry.type}:${entry.name} in Herdr`, "info");
 }
 
 /** Register the `input` handler, the commands, the autocomplete provider, and the lifecycle handlers. */
@@ -266,11 +297,11 @@ export default function (pi: ExtensionAPI): void {
 	}
 
 	pi.registerCommand("artifact", {
-		description: "Edit, delete, or pick artifacts",
+		description: "Edit, delete, show, or pick artifacts",
 		getArgumentCompletions: (prefix) => {
 			const items = completeArtifactArgs(prefix, listEntries(), fuzzyFilter);
 			return items.length > 0 ? items : null;
 		},
-		handler: (args, ctx) => runArtifactCommand(args, ctx, projectDir),
+		handler: (args, ctx) => runArtifactCommand(pi, args, ctx, projectDir),
 	});
 }

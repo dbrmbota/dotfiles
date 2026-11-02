@@ -1,11 +1,11 @@
-// Markdown viewer: the Docs panel. Shows the markdown files that programs in Herdr terminals ask for.
+// Markdown viewer: the Preview panel. Shows the markdown files that programs in Herdr terminals ask for.
 //
 // Label protocol (the public interface). From any Herdr terminal, on any machine:
 //   hc label "$HC_TERMINAL_ID" markdown.show.<id>=<absolute path of a UTF-8 .md file on that machine>
 // - <id> is [a-z0-9]+ and unique per request, e.g. base36 Date.now() plus 4 random base36 characters.
 // - Two copies of this mod run, both from theorian.json:
 //   - The button copy (props { button: true, panel, stack, child }) sits in the tab row, always shown.
-//     It draws the Docs show/hide button, takes the label, adds the doc to that space's list, clears
+//     It draws the Preview show/hide button, takes the label, adds the doc to that space's list, clears
 //     the label (markdown.show.<id>=), and opens the panel on the "markdown" child.
 //   - The panel copy (props { panel, stack, child }) draws the docs in the panel, when open.
 // - A request made while the app is closed is handled at the next start.
@@ -36,7 +36,7 @@ function findNode(node, id) {
   return null;
 }
 
-export default class Docs extends View {
+export default class Preview extends View {
   init(_props, cx) {
     this.cache = new Map();
     this.diagrams = new Map();
@@ -74,7 +74,7 @@ export default class Docs extends View {
       .child(this.renderDoc(doc, t, cx));
   }
 
-  // Private (button copy): the Docs button, centered in the tab row, drawn like the Files button. Dimmed when the
+  // Private (button copy): the Preview button, centered in the tab row, drawn like the Files button. Dimmed when the
   // panel is closed, selected background when visible(). Click runs togglePanel().
   renderButton(t) {
     const on = this.visible();
@@ -83,7 +83,7 @@ export default class Docs extends View {
       h_flex().id("docs-toggle").h(26).px(8).gap(5).flex_none().items_center().rounded(6).text_size(12)
         .bg(on ? t.selected : t.chrome).text_color(on ? t.foreground : t.muted).hover((s) => s.bg(t.hover))
         .on_mouse_down("left", stop).on_click(() => this.togglePanel())
-        .child(svg("mods/markdown-viewer/doc.svg").size(14)).child("Docs"));
+        .child(svg("mods/markdown-viewer/doc.svg").size(14)).child("Preview"));
   }
 
   // Private (button copy): takes the pending markdown requests from terminals(). For each not in this.handled:
@@ -102,7 +102,7 @@ export default class Docs extends View {
       if (this.handled.has(id)) continue;
       this.handled.add(id);
       state = addDoc(state, r.space, { path: r.path, machine: r.machine });
-      hc(["label", r.address, `${r.key}=`]).catch(() => {});
+      hc(["label", r.address, `${r.key}=`]).catch(() => { });
       if (r.space === active) {
         run("layout.select", { stack: config().stack, child: config().child });
         run("layout.show", { id: config().panel });

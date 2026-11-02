@@ -5,6 +5,7 @@ import {
 	applyRefCompletion,
 	buildRefHint,
 	buildRefSuggestions,
+	buildShowLabel,
 	buildStorePrompt,
 	completeArtifactArgs,
 	extractRefToken,
@@ -227,23 +228,32 @@ describe("applyRefCompletion", () => {
 	});
 });
 
+describe("buildShowLabel", () => {
+	it("builds markdown.show.<id>=<path>", () => {
+		assert.equal(buildShowLabel("abc", "/x/y.md"), "markdown.show.abc=/x/y.md");
+	});
+});
+
 describe("completeArtifactArgs", () => {
 	const entries = [entry("plan", "alpha", 2000, "Alpha"), entry("task", "beta", 1000, "Beta")];
 	const values = (prefix: string): string[] => completeArtifactArgs(prefix, entries, contains).map((item) => item.value);
 
 	it("completes the subcommand on the first word", () => {
-		assert.deepEqual(values(""), ["edit", "delete"]);
+		assert.deepEqual(values(""), ["edit", "delete", "show"]);
 		assert.deepEqual(values("ed"), ["edit"]);
+		assert.deepEqual(values("sh"), ["show"]);
 		assert.deepEqual(values("x"), []);
 	});
 
-	it("offers every artifact after edit or delete, carrying the full argument text", () => {
+	it("offers every artifact after edit, delete, or show, carrying the full argument text", () => {
 		assert.deepEqual(values("edit "), ["edit @plan:alpha", "edit @task:beta"]);
 		assert.deepEqual(values("delete "), ["delete @plan:alpha", "delete @task:beta"]);
+		assert.deepEqual(values("show "), ["show @plan:alpha", "show @task:beta"]);
 	});
 
 	it("fuzzy-matches the typed reference after the subcommand", () => {
 		assert.deepEqual(values("edit @pl"), ["edit @plan:alpha"]);
+		assert.deepEqual(values("show @pl"), ["show @plan:alpha"]);
 	});
 
 	it("labels items as type:name with the title as description", () => {
