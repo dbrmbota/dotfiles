@@ -1,0 +1,15 @@
+{
+  "name": "broad-search-guard",
+  "private": true,
+  "type": "module",
+  "pi": {
+    "extensions": ["./index.ts"]
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "web-tree-sitter": "0.26.13",
+    "tree-sitter-bash": "0.25.1"
+  }
+}

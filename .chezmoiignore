@@ -1,6 +1,7 @@
 # Excluded from `chezmoi apply` — dev/verification aids, not deployed.
 **/smoke.sh
 
-# Test dependencies for the agents extension: installed locally, not deployed.
+# Extension dependencies: installed locally, not deployed.
+# The agents extension's lockfile is dev-only (host packages in devDependencies).
 .pi/agent/extensions/*/node_modules
-.pi/agent/extensions/*/package-lock.json
+.pi/agent/extensions/agents/package-lock.json

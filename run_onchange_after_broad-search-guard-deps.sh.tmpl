@@ -1,0 +1,6 @@
+#!/bin/sh
+# Install broad-search-guard runtime deps (pkg {{ include "dot_pi/agent/extensions/broad-search-guard/package.json" | sha256sum }}, lock {{ include "dot_pi/agent/extensions/broad-search-guard/package-lock.json" | sha256sum }})
+set -eu
+command -v npm >/dev/null || { echo "broad-search-guard: npm not found; guard stays inactive" >&2; exit 0; }
+cd "$HOME/.pi/agent/extensions/broad-search-guard"
+npm ci --omit=dev --ignore-scripts --no-audit --no-fund
