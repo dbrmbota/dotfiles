@@ -42,19 +42,23 @@ describe("pendingGrants", () => {
 		assert.deepEqual(pendingGrants(["fetch_content"], ["fetch_content"], [], registered), []);
 	});
 
-	it("drops exact specs whose tool is already active", () => {
+	it("drops exact specs whose tool is already allowed", () => {
 		assert.deepEqual(pendingGrants(["read"], [], ["read", "bash"], registered), []);
 	});
 
-	it("drops patterns whose matches are all active", () => {
+	it("drops patterns whose matches are all allowed", () => {
 		assert.deepEqual(pendingGrants(["mcp__github__*"], [], ["mcp__github__search", "mcp__github__create_issue"], registered), []);
 	});
 
-	it("keeps patterns that are only partly active", () => {
+	it("keeps patterns that are only partly allowed", () => {
 		assert.deepEqual(pendingGrants(["mcp__github__*"], [], ["mcp__github__search"], registered), ["mcp__github__*"]);
 	});
 
-	it("keeps specs that are not active, and keeps patterns that match nothing yet", () => {
+	it("keeps a spec whose tool is registered but not allowed, which is the late MCP case", () => {
+		assert.deepEqual(pendingGrants(["mcp__github__search"], [], ["read"], registered), ["mcp__github__search"]);
+	});
+
+	it("keeps specs that are not allowed, and keeps patterns that match nothing yet", () => {
 		assert.deepEqual(pendingGrants(["fetch_content", "mcp__slack__*"], [], ["read"], registered), [
 			"fetch_content",
 			"mcp__slack__*",

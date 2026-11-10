@@ -40,18 +40,19 @@ export function replayGrants(entries: readonly BranchEntryLike[]): string[] {
 
 /**
  * The specs that still need granting: not already in `granted`, and not fully
- * active. A spec that matches nothing yet counts as not active, so it stays
- * pending.
+ * allowed. "Allowed" means the tools the active agent's effective specs resolve
+ * to, not pi's active tools. A spec that matches nothing yet counts as not
+ * allowed, so it stays pending.
  */
 export function pendingGrants(
 	specs: readonly string[],
 	granted: readonly string[],
-	activeNames: readonly string[],
+	allowedNames: readonly string[],
 	allNames: readonly string[],
 ): string[] {
 	return [...new Set(specs)].filter((spec) => {
 		if (granted.includes(spec)) return false;
 		const matches = expandToolSpecs([spec], allNames);
-		return !(matches.length > 0 && matches.every((name) => activeNames.includes(name)));
+		return !(matches.length > 0 && matches.every((name) => allowedNames.includes(name)));
 	});
 }

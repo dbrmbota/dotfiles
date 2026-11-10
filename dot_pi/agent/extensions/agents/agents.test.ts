@@ -64,6 +64,26 @@ metadata:
 Hidden skill body.
 `;
 
+const SLOW_SKILL_MD = `---
+name: slow
+description: Slow MCP skill
+metadata:
+  pi-tools: mcp__slow__search
+---
+
+Slow skill body.
+`;
+
+const LATE_SKILL_MD = `---
+name: late
+description: Late skill
+metadata:
+  pi-tools: late_tool
+---
+
+Late skill body.
+`;
+
 const GH_PROMPT_MD = `---
 description: Create a pull request
 tools: ask_user
@@ -292,6 +312,8 @@ function promptCommand(h: Harness, rel: string, name: string): Command {
 const REVIEW_SKILL_REL = "skills/review/SKILL.md";
 const HIDDEN_SKILL_REL = "skills/hidden/SKILL.md";
 const GH_PROMPT_REL = "prompts/gh-create-pr.md";
+const SLOW_SKILL_REL = "skills/slow/SKILL.md";
+const LATE_SKILL_REL = "skills/late/SKILL.md";
 
 /** Agents, skills, and a template that the grant tests share. */
 function grantFiles(): Record<string, string> {
@@ -302,6 +324,8 @@ function grantFiles(): Record<string, string> {
 		"agents/review.md": REVIEW_MD,
 		[REVIEW_SKILL_REL]: REVIEW_SKILL_MD,
 		[HIDDEN_SKILL_REL]: HIDDEN_SKILL_MD,
+		[SLOW_SKILL_REL]: SLOW_SKILL_MD,
+		[LATE_SKILL_REL]: LATE_SKILL_MD,
 		[GH_PROMPT_REL]: GH_PROMPT_MD,
 	};
 }
@@ -311,9 +335,17 @@ function grantHarness(options: SetupOptions = {}): Harness {
 	h.commandList.push(
 		skillCommand(h, REVIEW_SKILL_REL, "review"),
 		skillCommand(h, HIDDEN_SKILL_REL, "hidden"),
+		skillCommand(h, SLOW_SKILL_REL, "slow"),
+		skillCommand(h, LATE_SKILL_REL, "late"),
 		promptCommand(h, GH_PROMPT_REL, "gh-create-pr"),
 	);
 	return h;
+}
+
+/** Simulates an MCP server that connected after the session started: pi auto-activates its tools. */
+function registerLateMcpTool(h: Harness): void {
+	h.toolNames.push("mcp__slow__search");
+	h.activeTools.push("mcp__slow__search");
 }
 
 describe("agents extension", () => {
@@ -601,5 +633,53 @@ describe("invocation tool grants", () => {
 		await h.handlers.session_tree!({}, h.ctx);
 
 		assert.deepEqual(h.toolCalls.at(-1), ["read", "bash", "ask_user"]);
+	});
+
+	it("a restricted agent grants a late MCP tool that skill-refs expands, and keeps it in the run", async () => {
+		const h = grantHarness();
+		await start(h);
+		await switchTo(h, "build");
+		registerLateMcpTool(h);
+
+		h.pi.events.emit("skill-refs:expanded", { skills: [{ name: "slow", path: path.join(h.dir, SLOW_SKILL_REL) }] });
+		const options = await startRun(h, ["read", "bash", "mcp__slow__search"]);
+
+		assert.deepEqual(grantEntries(h).at(-1)?.data.tools, ["mcp__slow__search"]);
+		assert.ok(options.selectedTools.includes("mcp__slow__search"));
+	});
+
+	it("a restricted agent grants a late MCP tool that a leading /skill: names, and keeps it in the run", async () => {
+		const h = grantHarness();
+		await start(h);
+		await switchTo(h, "build");
+		registerLateMcpTool(h);
+
+		await submit(h, "/skill:slow search for it");
+		const options = await startRun(h, ["read", "bash", "mcp__slow__search"]);
+
+		assert.deepEqual(grantEntries(h).at(-1)?.data.tools, ["mcp__slow__search"]);
+		assert.ok(options.selectedTools.includes("mcp__slow__search"));
+	});
+
+	it("an unrestricted agent counts a late MCP tool as baseline and records no grant for it", async () => {
+		const h = grantHarness();
+		await start(h);
+		registerLateMcpTool(h);
+
+		await submit(h, "/skill:slow search for it");
+
+		assert.deepEqual(grantEntries(h), []);
+	});
+
+	it("an unrestricted agent with a grant keeps a late MCP tool in the run", async () => {
+		const h = grantHarness();
+		await start(h);
+		registerLateMcpTool(h);
+
+		await submit(h, "/skill:late do it");
+		const options = await startRun(h, [...h.activeTools]);
+
+		assert.deepEqual(grantEntries(h).at(-1)?.data.tools, ["late_tool"]);
+		assert.ok(options.selectedTools.includes("mcp__slow__search"));
 	});
 });

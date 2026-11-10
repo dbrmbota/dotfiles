@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "1.4.0",
+  "lastChangelogVersion": "1.5.0",
   "theme": "tokyonight",
   "defaultProvider": "opencode",
   "defaultModel": "muse-spark-1.3",
@@ -26,5 +26,9 @@
   "piVim": {
     "clipboardMirror": "yank"
   },
-  "hideThinkingBlock": false
+  "hideThinkingBlock": false,
+  "extensionChangelogVersions": {
+    "{\"source\":\"npm:@normful/pi-auto-name\",\"scope\":\"user\"}": "2.1.0",
+    "{\"source\":\"npm:@baylarsadigov/omp-undo-redo\",\"scope\":\"user\"}": "1.8.0"
+  }
 }

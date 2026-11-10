@@ -68,7 +68,6 @@ export interface AgentsController {
 interface Baseline {
 	model?: string;
 	thinking: ThinkingLevel;
-	tools: string[];
 }
 
 function sleep(ms: number): Promise<void> {
@@ -91,7 +90,7 @@ function realpathOf(file: string): string | undefined {
 export function createAgentsController(pi: ExtensionAPI): AgentsController {
 	const agentVars = new Map<string, string>();
 	let catalog: AgentDefinition[] = [];
-	let baseline: Baseline = { thinking: "high", tools: [] };
+	let baseline: Baseline = { thinking: "high" };
 	let activeName = DEFAULT_AGENT;
 	let projectConfig: ProjectConfig = {};
 	let grants: string[] = [];
@@ -144,7 +143,7 @@ export function createAgentsController(pi: ExtensionAPI): AgentsController {
 					: undefined;
 		const thinking =
 			parseThinking(settings?.defaultThinkingLevel) ?? (pi.getThinkingLevel() as ThinkingLevel) ?? "high";
-		baseline = { model, thinking, tools: baselineTools() };
+		baseline = { model, thinking };
 	}
 
 	function emitChange(def: AgentDefinition): void {
@@ -157,7 +156,12 @@ export function createAgentsController(pi: ExtensionAPI): AgentsController {
 
 	/** The tool specs an agent gets this run: its own, project additions, and grants. */
 	function effectiveSpecs(def: AgentDefinition): string[] | undefined {
-		return effectiveToolSpecs(def, projectConfig[def.name], baseline.tools, grants);
+		return effectiveToolSpecs(def, projectConfig[def.name], baselineTools(), grants);
+	}
+
+	/** The tool names an agent's effective specs allow, expanded against `names`. This is the set the per-turn filter keeps. */
+	function allowedToolNames(def: AgentDefinition, names: readonly string[]): string[] {
+		return expandToolSpecs(effectiveSpecs(def) ?? baselineTools(), names);
 	}
 
 	/**
@@ -170,7 +174,7 @@ export function createAgentsController(pi: ExtensionAPI): AgentsController {
 		const names = allToolNames();
 		const unknown = unresolvedSpecs(def.tools ?? [], names).filter((spec) => !isToolPattern(spec));
 		if (unknown.length > 0) ctx.ui.notify(`agents: unknown tools: ${unknown.join(", ")}`, "warning");
-		const valid = expandToolSpecs(effectiveSpecs(def) ?? baseline.tools, names);
+		const valid = expandToolSpecs(effectiveSpecs(def) ?? baselineTools(), names);
 		if (valid.length > 0) pi.setActiveTools(valid);
 		else ctx.ui.notify(`agents: "${def.name}" enables no known tools; keeping current tools`, "warning");
 	}
@@ -287,12 +291,17 @@ export function createAgentsController(pi: ExtensionAPI): AgentsController {
 	}
 
 	/**
-	 * Grant `specs` for the rest of the session. The grant is recorded at once, so a
+	 * Grant `specs` for the rest of the session. A spec is skipped when it is already
+	 * granted or when the active agent's effective specs already allow it. Without an
+	 * active agent, pi's active tools decide. The grant is recorded at once, so a
 	 * second source for the same invocation finds nothing pending. Tool activation
 	 * waits in the background, and `inflight` keeps the next run waiting for it.
 	 */
 	function grant(specs: string[], label: string, ctx: ExtensionContext): void {
-		const fresh = pendingGrants(specs, grants, pi.getActiveTools(), allToolNames());
+		const names = allToolNames();
+		const def = active();
+		const allowedNames = def ? allowedToolNames(def, names) : pi.getActiveTools();
+		const fresh = pendingGrants(specs, grants, allowedNames, names);
 		if (fresh.length === 0) return;
 		grants = [...grants, ...fresh];
 		try {
