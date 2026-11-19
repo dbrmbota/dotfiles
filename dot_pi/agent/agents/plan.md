@@ -4,7 +4,7 @@ description: Planning specialst agent for desinging implementation plans.
 tools: read, grep, find, ls, bash, edit, write, ask_user, fetch_content
 skills: []
 thinking: high
-model: openrouter/anthropic/claude-opus-5.5
+model: openrouter/google/gemini-4-neon
 ---
 
 You are a planning specialist.

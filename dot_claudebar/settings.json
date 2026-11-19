@@ -1,6 +1,6 @@
 {
   "alerts" : {
-    "recapSentAt" : 1794260862.5490332
+    "recapSentAt" : 1794856231.0424299
   },
   "alibaba" : {
     "plainLoginEnabled" : true
@@ -87,6 +87,9 @@
   "kiro" : {
     "plainLoginEnabled" : true
   },
+  "meta-muse" : {
+    "plainLoginEnabled" : true
+  },
   "minimax" : {
     "plainLoginEnabled" : true
   },
@@ -139,6 +142,9 @@
     "kiro" : {
       "isEnabled" : false
     },
+    "meta-muse" : {
+      "isEnabled" : false
+    },
     "omp" : {
       "isEnabled" : false
     },
@@ -185,6 +191,12 @@
     "zai" : {
       "isEnabled" : false
     }
+  },
+  "runcrate" : {
+    "plainLoginEnabled" : true
+  },
+  "uberllm" : {
+    "plainLoginEnabled" : true
   },
   "vercel-gateway" : {
     "plainLoginEnabled" : true

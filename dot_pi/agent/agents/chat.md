@@ -1,6 +1,6 @@
 ---
 name: chat
 description: Default agent — full tools, your standard model
-model: openrouter/anthropic/claude-haiku-5.5
+model: openrouter/google/gemini-4-hydrogen
 thinking: high
 ---
