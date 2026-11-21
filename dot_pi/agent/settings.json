@@ -29,6 +29,6 @@
   "hideThinkingBlock": false,
   "extensionChangelogVersions": {
     "{\"source\":\"npm:@normful/pi-auto-name\",\"scope\":\"user\"}": "2.1.0",
-    "{\"source\":\"npm:@baylarsadigov/omp-undo-redo\",\"scope\":\"user\"}": "1.8.0"
+    "{\"source\":\"npm:@baylarsadigov/omp-undo-redo\",\"scope\":\"user\"}": "1.8.1"
   }
 }

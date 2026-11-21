@@ -1,0 +1,145 @@
+{
+  "activeBorder" : true,
+  "animateWindows" : true,
+  "appSpaces" : {
+
+  },
+  "dimInactive" : false,
+  "floatApps" : [
+    "Activity Monitor",
+    "App Store",
+    "Archive Utility",
+    "Calculator",
+    "Dictionary",
+    "FaceTime",
+    "Photo Booth",
+    "Screen Sharing",
+    "Software Update",
+    "System Information",
+    "System Settings"
+  ],
+  "floatTitles" : [
+    {
+      "app" : "Finder",
+      "title" : "Co(py|nnect)|Move|Info|Pref"
+    }
+  ],
+  "focusFollowsMouse" : false,
+  "gap" : 16,
+  "keys" : {
+    "cmd--" : "shrink",
+    "cmd-0" : "space 10",
+    "cmd-1" : "space 1",
+    "cmd-2" : "space 2",
+    "cmd-3" : "space 3",
+    "cmd-4" : "space 4",
+    "cmd-5" : "space 5",
+    "cmd-6" : "space 6",
+    "cmd-7" : "space 7",
+    "cmd-8" : "space 8",
+    "cmd-9" : "space 9",
+    "cmd-;" : "retile",
+    "cmd-=" : "grow",
+    "cmd-[" : "stack prev",
+    "cmd-]" : "stack next",
+    "cmd-down" : "join south",
+    "cmd-f" : "zoom",
+    "cmd-h" : "focus west",
+    "cmd-j" : "focus south",
+    "cmd-k" : "focus north",
+    "cmd-l" : "focus east",
+    "cmd-left" : "join west",
+    "cmd-r" : "restore",
+    "cmd-right" : "join east",
+    "cmd-t" : "float",
+    "cmd-up" : "join north",
+    "cmd-x" : "mirror vertical",
+    "cmd-y" : "mirror horizontal",
+    "shift-cmd-0" : "send 10",
+    "shift-cmd-1" : "send 1",
+    "shift-cmd-2" : "send 2",
+    "shift-cmd-3" : "send 3",
+    "shift-cmd-4" : "send 4",
+    "shift-cmd-5" : "send 5",
+    "shift-cmd-6" : "send 6",
+    "shift-cmd-7" : "send 7",
+    "shift-cmd-8" : "send 8",
+    "shift-cmd-9" : "send 9",
+    "shift-cmd-h" : "swap west",
+    "shift-cmd-j" : "swap south",
+    "shift-cmd-k" : "swap north",
+    "shift-cmd-l" : "swap east"
+  },
+  "menuBar" : {
+    "indexStyle" : "single",
+    "items" : [
+      {
+        "item" : "profileIcon",
+        "shown" : false
+      },
+      {
+        "item" : "profileName",
+        "shown" : false
+      },
+      {
+        "item" : "logo",
+        "shown" : true
+      },
+      {
+        "item" : "index",
+        "shown" : false
+      },
+      {
+        "item" : "name",
+        "shown" : false
+      },
+      {
+        "item" : "layout",
+        "shown" : false
+      },
+      {
+        "item" : "windowCount",
+        "shown" : false
+      },
+      {
+        "item" : "stacked",
+        "shown" : true
+      }
+    ]
+  },
+  "mouseFollowsFocus" : true,
+  "padding" : 16,
+  "spaces" : [
+    {
+      "space" : 1
+    },
+    {
+      "space" : 2
+    },
+    {
+      "space" : 3
+    },
+    {
+      "space" : 4
+    },
+    {
+      "space" : 5
+    },
+    {
+      "space" : 6
+    },
+    {
+      "space" : 7
+    },
+    {
+      "space" : 8
+    },
+    {
+      "space" : 9
+    },
+    {
+      "space" : 10
+    }
+  ],
+  "windowPreviews" : true
+}
