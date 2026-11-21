@@ -4,6 +4,7 @@
   "appSpaces" : {
 
   },
+  "borderOpacity" : 0.3972021484375001,
   "dimInactive" : false,
   "floatApps" : [
     "Activity Monitor",
