@@ -1,0 +1,47 @@
+-- Migrated from herdr-app (/Users/dbrmbota/.config/herdr-app/keys.json)
+-- Prefix: ctrl+b (with ctrl+b>ctrl+b passthrough to the focused terminal)
+
+rex.bind("ctrl+b>ctrl+b", "pane.send_key", { key = "ctrl+b" })
+
+-- Tabs
+rex.bind("ctrl+b>c", "client.tab.new")
+rex.bind("ctrl+b>shift+t", "client.tab.rename")
+rex.bind("ctrl+b>shift+x", "client.tab.close")
+rex.bind("ctrl+b>n", "client.tab.next")
+rex.bind("ctrl+b>p", "client.tab.previous")
+rex.bind("ctrl+b>1", "client.tab.goto", { index = 1 })
+rex.bind("ctrl+b>2", "client.tab.goto", { index = 2 })
+rex.bind("ctrl+b>3", "client.tab.goto", { index = 3 })
+rex.bind("ctrl+b>4", "client.tab.goto", { index = 4 })
+rex.bind("ctrl+b>5", "client.tab.goto", { index = 5 })
+rex.bind("ctrl+b>6", "client.tab.goto", { index = 6 })
+rex.bind("ctrl+b>7", "client.tab.goto", { index = 7 })
+rex.bind("ctrl+b>8", "client.tab.goto", { index = 8 })
+rex.bind("ctrl+b>9", "client.tab.goto", { index = 9 })
+
+-- Panes
+rex.bind("ctrl+b>v", "pane.split", { direction = "right" })
+rex.bind("ctrl+b>-", "pane.split", { direction = "down" })
+rex.bind("ctrl+b>x", "pane.close")
+rex.bind("ctrl+b>z", "pane.zoom")
+rex.bind("ctrl+b>h", "pane.focus", { direction = "left" })
+rex.bind("ctrl+b>j", "pane.focus", { direction = "down" })
+rex.bind("ctrl+b>k", "pane.focus", { direction = "up" })
+rex.bind("ctrl+b>l", "pane.focus", { direction = "right" })
+rex.bind("ctrl+b>shift+h", "pane.move", { direction = "left" })
+rex.bind("ctrl+b>shift+j", "pane.move", { direction = "down" })
+rex.bind("ctrl+b>shift+k", "pane.move", { direction = "up" })
+rex.bind("ctrl+b>shift+l", "pane.move", { direction = "right" })
+
+-- Sessions & App
+rex.bind("ctrl+b>b", "client.sidebar.toggle")
+rex.bind("ctrl+b>s", "client.settings")
+rex.bind("ctrl+b>shift+n", "session.new")
+rex.bind("ctrl+b>shift+w", "session.rename")
+rex.bind("ctrl+b>shift+d", "session.close")
+rex.bind("ctrl+b>q", "client.window.close")
+
+-- Terminal
+rex.bind("cmd+c", "pane.copy")
+rex.bind("cmd+v", "pane.paste")
+rex.bind("alt+backspace", "pane.send_key", { key = "ctrl+w" })
