@@ -9,41 +9,22 @@
  * Zentui must have components.editor.enabled=false and footer.style="native".
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { type ChromedEditor, type VimEditorLike, installEditorChrome } from "./editor";
-import { createFooterFactory } from "./footer";
+import { type VimEditorLike, installEditorChrome } from "./editor";
+import { type FooterMeta, createFooterFactory } from "./footer";
 import { installBlockChrome } from "./blocks";
 
 const OPTIONS = {
-	editor: {
-		bodyBackground: true, // opencode-style input surface; false = rail only
-		railGlyph: "┃", // drawn in the mode colour
-		railCapGlyph: "╹", // half-height stub closing the rail on the final row
-	},
 	footer: {
 		icons: {
-			branch: "\ue0a0", //
-			cache: "\udb80\udd9c", // 󰆼
-			separatorRight: "\ue0b0", //
-			separatorLeft: "\ue0b2", //
+			cache: "\udb80\udd9c",
 		},
 		contextThresholds: { warning: 70, error: 90 },
 		hiddenStatuses: ["sandbox"], // the pi-sandbox chip is noise
 	},
-	blocks: {
-		railGlyph: "┃",
-		// Rail colour per block background (user messages, tool calls, compaction/custom).
-		railColors: {
-			userMessageBg: "accent",
-			toolPendingBg: "warning",
-			toolSuccessBg: "success",
-			toolErrorBg: "error",
-			customMessageBg: "customMessageLabel",
-		},
-	} as const,
+	scrollIndicatorCaps: { capLeft: "\ue0b6", capRight: "\ue0b4" },
 };
 
 export default function (pi: ExtensionAPI) {
-	let chromed: ChromedEditor | undefined;
 	let requestRender: (() => void) | undefined;
 	let agent: { name: string; color?: string } | undefined;
 
@@ -62,29 +43,28 @@ export default function (pi: ExtensionAPI) {
 		requestRender?.();
 	});
 
-	const modeLabel = () => chromed?.modeLabel() ?? " INSERT ";
-
 	const install = (ctx: ExtensionContext) => {
 		const previous = ctx.ui.getEditorComponent();
 		if (typeof previous !== "function") return; // pi-vim not loaded before us
 
-		const meta = () => ({
+		const meta = (): FooterMeta => ({
 			model: ctx.model?.id,
 			provider: ctx.model?.provider,
 			thinking: ctx.thinkingLevel,
 			agent,
 		});
 
+		const footer = createFooterFactory(ctx, meta, OPTIONS.footer);
+		// setFooter first, so footerData is captured before the editor's first render.
+		ctx.ui.setFooter(footer.footerFactory);
+
 		ctx.ui.setEditorComponent((tui, theme, keybindings) => {
 			const editor = previous(tui, theme, keybindings) as unknown as VimEditorLike;
 			requestRender = () => tui.requestRender();
 			// Read the full pi Theme live so /theme switches are picked up.
-			chromed = installEditorChrome(editor, () => ctx.ui.theme, OPTIONS.editor, meta);
+			installEditorChrome(editor, () => ctx.ui.theme, footer.getStatus);
 			return editor as unknown as ReturnType<typeof previous>;
 		});
-
-		const footer = createFooterFactory(ctx, modeLabel, OPTIONS.footer);
-		ctx.ui.setFooter(footer.factory);
 		return footer;
 	};
 
@@ -94,12 +74,13 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_start", (_event, ctx) => {
 		if (!ctx.hasUI) return;
 		footer = install(ctx);
-		uninstallBlocks ??= installBlockChrome(() => ctx.ui.theme, OPTIONS.blocks);
+		uninstallBlocks ??= installBlockChrome(() => ctx.ui.theme, OPTIONS.scrollIndicatorCaps);
 	});
 
 	// Footer/editor read live state on every render; just make sure a frame happens.
 	pi.events.on("pi-vim:mode-change", () => requestRender?.());
 	pi.on("model_select", () => requestRender?.());
+	pi.on("thinking_level_select", () => requestRender?.());
 	pi.on("turn_end", () => requestRender?.());
 	pi.on("agent_end", () => {
 		footer?.refreshSettings();
@@ -109,7 +90,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_shutdown", () => {
 		uninstallBlocks?.();
 		uninstallBlocks = undefined;
-		chromed = undefined;
+		footer = undefined;
 		requestRender = undefined;
 	});
 }

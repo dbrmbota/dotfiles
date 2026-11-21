@@ -1,37 +1,13 @@
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import { stripVTControlCharacters } from "node:util";
+import type { BorderStatus } from "./footer";
+import { formatBottomBorder, formatTopBorder, frameLines } from "./border";
 import { paintSelection } from "./selection";
-import {
-	RESET_FG,
-	bgAnsi,
-	bgToFg,
-	fg,
-	fgAnsi,
-	modeColor,
-	modeKindFromLabel,
-	padRight,
-	paintBackground,
-} from "./style";
+import { type ModeKind, fg, fgAnsi, modeColor, modeKindFromLabel, modePendingFromLabel, padRight } from "./style";
 
-/** Columns used by the rail + gap on the left of every editor row. */
-const CHROME_WIDTH = 2;
-
-export type EditorChromeOptions = {
-	/** Paint the input surface with the theme's userMessageBg (opencode look). */
-	bodyBackground: boolean;
-	/** Glyph for the left rail, drawn in the mode colour (e.g. "┃"). */
-	railGlyph: string;
-	/** Glyph that caps the rail on the final (half-height) chrome row (e.g. "╹"). */
-	railCapGlyph: string;
-};
-
-export type EditorMeta = {
-	model?: string;
-	provider?: string;
-	thinking?: string;
-	agent?: { name: string; color?: string };
-};
+/** Columns inset on each side of the rounded editor frame: 1 border column plus 1 padding column. */
+const INSET_X = 2;
 
 type MouseEvent = { x: number; y: number } & Record<string, unknown>;
 
@@ -45,11 +21,6 @@ export type VimEditorLike = {
 	getModeLabel?(): string;
 };
 
-export type ChromedEditor = {
-	/** Raw pi-vim label, e.g. " NORMAL ", " NORMAL 2d_ ", " EX :w_ ", " V-LINE ". */
-	modeLabel(): string;
-};
-
 const VIEWPORT_ABOVE = /^─── ↑ ([1-9]\d*) more ─*$/;
 const VIEWPORT_BELOW = /^─── ↓ ([1-9]\d*) more ─*$/;
 const PLAIN_BORDER = /^─+$/;
@@ -61,12 +32,16 @@ function isBorder(line: string, below: boolean): string | undefined {
 	return match ? match[1] : undefined;
 }
 
+/**
+ * Installs the vim-chrome frame on `editor`. The frame takes the mode colour (vibrant), shows pending keys
+ * or the EX command on its top border, and shows `getStatus` items on its bottom border. Mouse rows map
+ * back to the base editor.
+ */
 export function installEditorChrome(
 	editor: VimEditorLike,
 	getTheme: () => Theme,
-	options: EditorChromeOptions,
-	getMeta: () => EditorMeta,
-): ChromedEditor {
+	getStatus: (theme: Theme, kind: ModeKind) => BorderStatus,
+): void {
 	const proto = Object.getPrototypeOf(editor) as VimEditorLike;
 	const originalRender = proto.render;
 	const originalMouse = editor.handleMouse ? editor.handleMouse.bind(editor) : undefined;
@@ -94,16 +69,12 @@ export function installEditorChrome(
 	let layout = { above: 0, content: 0, below: 0, autocomplete: 0 };
 
 	editor.render = function render(width: number): string[] {
-		const innerWidth = Math.max(1, width - CHROME_WIDTH);
+		if (width < 5) return originalRender.call(editor, width);
+		const innerWidth = Math.max(1, width - INSET_X * 2);
 		const lines = originalRender.call(editor, innerWidth);
 		if (lines.length === 0) return lines;
 
 		const theme = getTheme();
-		const label = modeLabel();
-		const kind = modeKindFromLabel(label);
-		const bodyBg = options.bodyBackground ? bgAnsi(theme, "userMessageBg") : undefined;
-		// Rail sits on the terminal background; only the body gets the surface colour.
-		const rail = `${fgAnsi(theme, modeColor(kind))}${options.railGlyph}${RESET_FG}`;
 
 		// Slice using pi-tui's bookkeeping; fall back to a border scan.
 		let contentCount = editor.renderedVisibleLineCount;
@@ -125,119 +96,58 @@ export function installEditorChrome(
 			// keep pi-vim's rows if the editor internals changed shape
 		}
 
-		const surface = (line: string): string => {
-			const body = ` ${padRight(line, innerWidth, visibleWidth(line))}`;
-			return `${rail}${bodyBg ? paintBackground(body, bodyBg) : body}`;
-		};
+		const surface = (line: string): string => ` ${padRight(line, innerWidth, visibleWidth(line))} `;
 		const hint = (text: string): string => surface(fg(theme, "muted", text));
-		// Final row: the rail ends in a heavy "up" stub and the surface is drawn
-		// with upper-half blocks, so the box bottom is half-height and the rail
-		// reads as continuous with the full-height rows above it.
-		const cap = (): string => {
-			const railCap = `${fgAnsi(theme, modeColor(kind))}${options.railCapGlyph}${RESET_FG}`;
-			const capBody = bodyBg
-				? `${bgToFg(bodyBg)}${"▀".repeat(Math.max(0, width - 1))}${RESET_FG}`
-				: " ".repeat(Math.max(0, width - 1));
-			return railCap + capBody;
-		};
 
-		const out: string[] = [];
-		out.push(surface(""));
-		if (above) out.push(hint(`↑ ${above} more`));
-		for (const line of content) out.push(surface(line));
-		if (below) out.push(hint(`↓ ${below} more`));
-		for (const line of autocomplete) out.push(surface(line));
-		out.push(surface(""));
-		out.push(surface(metaRow(innerWidth, label, kind, theme, getMeta())));
-		out.push(cap());
+		const rows: string[] = [];
+		rows.push(surface(""));
+		if (above) rows.push(hint(`↑ ${above} more`));
+		for (const line of content) rows.push(surface(line));
+		if (below) rows.push(hint(`↓ ${below} more`));
+		for (const line of autocomplete) rows.push(surface(line));
+		rows.push(surface(""));
 
+		// The frame's top border row sits above the first padding row.
 		layout = {
-			above: 1 + (above ? 1 : 0),
+			above: 2 + (above ? 1 : 0),
 			content: content.length,
 			below: below ? 1 : 0,
 			autocomplete: autocomplete.length,
 		};
-		return out.map((line) => truncateToWidth(line, width, ""));
+		const rawLabel = modeLabel();
+		const kind = modeKindFromLabel(rawLabel);
+		const pending = modePendingFromLabel(rawLabel);
+		const borderFg = fgAnsi(theme, modeColor(kind));
+		const status = getStatus(theme, kind);
+		const top = formatTopBorder(width, borderFg, pending ? `${borderFg}${pending}` : "", visibleWidth, (text, w) =>
+			truncateToWidth(text, w, ""),
+		);
+		const bottom = formatBottomBorder(width, borderFg, status.left, status.right, status.middle, visibleWidth);
+		return frameLines(rows, width, borderFg, visibleWidth, (text, w) => truncateToWidth(text, w, ""), { top, bottom });
 	};
 
 	if (originalMouse) {
 		editor.handleMouse = function handleMouse(event: MouseEvent) {
-			const { above, content, below } = layout;
+			if (event.x < 1 || (typeof event.width === "number" && event.x >= event.width - 1)) return false;
+			const { above, content, below, autocomplete } = layout;
 			let y = event.y;
 			if (y < above) return false;
 			if (y < above + content) {
 				y = y - above + 1; // base rows 1..n are content
 			} else if (y < above + content + below) {
 				return false; // viewport hint row
-			} else {
+			} else if (y < above + content + below + autocomplete) {
 				y = y - above - content - below + content + 2; // base autocomplete starts at n+2
+			} else {
+				return false; // bottom padding row
 			}
-			return originalMouse({ ...event, x: Math.max(0, event.x - CHROME_WIDTH), y });
+			return originalMouse({
+				...event,
+				x: Math.max(0, event.x - INSET_X),
+				y,
+				...(typeof event.width === "number" ? { width: event.width - INSET_X * 2 } : {}),
+			});
 		};
 	}
 
-	return { modeLabel };
-}
-
-function providerLabel(provider: string | undefined): string {
-	if (!provider) return "";
-	const known: Record<string, string> = {
-		anthropic: "Anthropic",
-		openai: "OpenAI",
-		"openai-codex": "Codex",
-		google: "Google",
-		gemini: "Google",
-		opencode: "OpenCode Zen",
-		"opencode-go": "OpenCode Go",
-		openrouter: "OpenRouter",
-		xai: "xAI",
-		groq: "Groq",
-		mistral: "Mistral",
-		ollama: "Ollama",
-	};
-	return (
-		known[provider] ??
-		provider
-			.split("-")
-			.map((part) => (part ? part[0]!.toUpperCase() + part.slice(1) : part))
-			.join(" ")
-	);
-}
-
-/** Inner content (no rail/gap) of the model row, fitted to `available` columns. */
-function metaRow(
-	available: number,
-	label: string,
-	kind: ReturnType<typeof modeKindFromLabel>,
-	theme: Theme,
-	meta: EditorMeta,
-): string {
-	const dot = fg(theme, "dim", " · ");
-	const accent = modeColor(kind); // same colour as the rail
-	const parts: string[] = [];
-	if (meta.agent) {
-		const color = (meta.agent.color ?? accent) as Parameters<Theme["fg"]>[0];
-		parts.push(fg(theme, color, meta.agent.name));
-	}
-	var modelParts = []
-	if (meta.provider) modelParts.push(meta.provider);
-	if (meta.model) modelParts.push(meta.model)
-	const model = modelParts.join('/');
-	if (model) parts.push(fg(theme, "muted", model));
-	if (meta.thinking && meta.thinking.toLowerCase() !== "off") {
-		parts.push(fg(theme, accent, meta.thinking));
-	}
-	const right = parts.join(dot);
-
-	let left = "";
-	if (kind === "ex") {
-		// " EX :cmd_ " → ":cmd_"
-		const command = label.trim().replace(/^EX\s?/, "");
-		left = fg(theme, "warning", command);
-	}
-
-	if (!left) return truncateToWidth(right, available, "…");
-	const gap = available - visibleWidth(left) - visibleWidth(right);
-	if (gap >= 2) return `${left}${" ".repeat(gap)}${right}`;
-	return truncateToWidth(left, available, "…");
 }
