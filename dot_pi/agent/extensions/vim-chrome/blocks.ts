@@ -45,8 +45,11 @@ type TextView = { customBgFn?: (text: string) => string; paddingY: number };
 type MarkdownView = { defaultTextStyle?: { bgColor?: (text: string) => string }; paddingY: number };
 type BashView = { contentContainer?: { render?(width: number): string[] }; colorKey?: "bashMode" | "dim" };
 
-/** Left inset of framed content in columns: the border column plus one space of padding. */
-const INSET_X = 2;
+/** Outer horizontal margin in columns on each side of framed blocks (keeps right border clear of the scrollbar). */
+const MARGIN_X = 1;
+
+/** Left inset of framed Container content in columns: margin, border column, plus one space of padding. */
+const INSET_X = MARGIN_X + 2;
 
 /** Key of the layout that a framed Container recorded in its last render, read back by its handleMouse. */
 const FRAME_LAYOUT = Symbol.for("vim-chrome.blocks.frame-layout");
@@ -175,32 +178,46 @@ function patchPrototype(proto: object, build: (original: Originals) => Originals
 
 /** Patches Box.prototype.render and handleMouse. Returns the restore function. */
 function patchBox(getTheme: () => Theme): () => void {
+	const chromeWidth = 2 + 2 * MARGIN_X;
 	return patchPrototype(Box.prototype, (original) => ({
 		render(this: BoxView, width: number): string[] {
 			const bg = extractBgSgr(this.bgFn);
-			if (!bg || width < 3) return original.render.call(this, width);
+			if (!bg || width < 3 + 2 * MARGIN_X) return original.render.call(this, width);
 			const { bgFn, paddingY } = this;
 			this.bgFn = undefined;
 			this.paddingY = Math.max(0, paddingY - 1);
 			let lines: string[];
 			try {
-				lines = original.render.call(this, width - 2);
+				lines = original.render.call(this, width - chromeWidth);
 			} finally {
 				this.bgFn = bgFn;
 				this.paddingY = paddingY;
 			}
-			return frameLines(lines, width, borderFgFromBgSgr(getTheme(), bg), visibleWidth, (text, w) =>
-				truncateToWidth(text, w, ""),
+			return frameLines(
+				lines,
+				width,
+				borderFgFromBgSgr(getTheme(), bg),
+				visibleWidth,
+				(text, w) => truncateToWidth(text, w, ""),
+				{ marginX: MARGIN_X },
 			);
 		},
 		handleMouse(this: BoxView, event: TuiMouseEvent): unknown {
-			if (!extractBgSgr(this.bgFn) || event.width < 3) return original.handleMouse?.call(this, event);
+			if (!extractBgSgr(this.bgFn) || event.width < 3 + 2 * MARGIN_X) return original.handleMouse?.call(this, event);
 			const { x, y, width, height } = event;
-			if (x < 1 || x >= width - 1 || y < 1 || (height !== undefined && y >= height - 1)) return undefined;
+			const borderInset = MARGIN_X + 1;
+			if (x < borderInset || x >= width - borderInset || y < 1 || (height !== undefined && y >= height - 1)) {
+				return undefined;
+			}
 			const { paddingY } = this;
 			this.paddingY = Math.max(0, paddingY - 1);
 			try {
-				return original.handleMouse?.call(this, { ...event, x: x - 1, y: y - 1, width: width - 2 });
+				return original.handleMouse?.call(this, {
+					...event,
+					x: x - borderInset,
+					y: y - 1,
+					width: width - chromeWidth,
+				});
 			} finally {
 				this.paddingY = paddingY;
 			}
@@ -210,22 +227,28 @@ function patchBox(getTheme: () => Theme): () => void {
 
 /** Patches Text.prototype.render. Returns the restore function. */
 function patchText(getTheme: () => Theme): () => void {
+	const chromeWidth = 2 + 2 * MARGIN_X;
 	return patchPrototype(Text.prototype, (original) => ({
 		render(this: TextView, width: number): string[] {
 			const bg = extractBgSgr(this.customBgFn);
-			if (!bg || width < 3) return original.render.call(this, width);
+			if (!bg || width < 3 + 2 * MARGIN_X) return original.render.call(this, width);
 			const { customBgFn, paddingY } = this;
 			this.customBgFn = undefined;
 			this.paddingY = Math.max(0, paddingY - 1);
 			let lines: string[];
 			try {
-				lines = original.render.call(this, width - 2);
+				lines = original.render.call(this, width - chromeWidth);
 			} finally {
 				this.customBgFn = customBgFn;
 				this.paddingY = paddingY;
 			}
-			return frameLines(lines, width, borderFgFromBgSgr(getTheme(), bg), visibleWidth, (text, w) =>
-				truncateToWidth(text, w, ""),
+			return frameLines(
+				lines,
+				width,
+				borderFgFromBgSgr(getTheme(), bg),
+				visibleWidth,
+				(text, w) => truncateToWidth(text, w, ""),
+				{ marginX: MARGIN_X },
 			);
 		},
 	}));
@@ -233,17 +256,18 @@ function patchText(getTheme: () => Theme): () => void {
 
 /** Patches Markdown.prototype.render (user messages). Returns the restore function. */
 function patchMarkdown(getTheme: () => Theme): () => void {
+	const chromeWidth = 2 + 2 * MARGIN_X;
 	return patchPrototype(Markdown.prototype, (original) => ({
 		render(this: MarkdownView, width: number): string[] {
 			const style = this.defaultTextStyle;
 			const bg = extractBgSgr(style?.bgColor);
-			if (!style || !bg || width < 3) return original.render.call(this, width);
+			if (!style || !bg || width < 3 + 2 * MARGIN_X) return original.render.call(this, width);
 			const { paddingY } = this;
 			this.defaultTextStyle = { ...style, bgColor: undefined };
 			this.paddingY = Math.max(0, paddingY - 1);
 			let lines: string[];
 			try {
-				lines = original.render.call(this, width - 2);
+				lines = original.render.call(this, width - chromeWidth);
 			} finally {
 				this.defaultTextStyle = style;
 				this.paddingY = paddingY;
@@ -252,9 +276,18 @@ function patchMarkdown(getTheme: () => Theme): () => void {
 			const borderFg = borderFgFromBgSgr(theme, bg);
 			const truncate = (text: string, w: number) => truncateToWidth(text, w, "");
 			const top = isUserMessageBg(theme, bg)
-				? formatTopBorder(width, borderFg, `${borderFg}${theme.bold("User")}`, visibleWidth, truncate)
+				? formatTopBorder(
+						width - 2 * MARGIN_X,
+						borderFg,
+						`${borderFg}${theme.bold("User")}`,
+						visibleWidth,
+						truncate,
+					)
 				: undefined;
-			return frameLines(lines, width, borderFg, visibleWidth, truncate, top ? { top } : undefined);
+			return frameLines(lines, width, borderFg, visibleWidth, truncate, {
+				...(top ? { top } : {}),
+				marginX: MARGIN_X,
+			});
 		},
 	}));
 }
@@ -301,10 +334,10 @@ function findDynamicBorderBounds(children: readonly unknown[]): { topIdx: number
 
 /**
  * Frame bounds for `container` rendered at `width`. Undefined for a plain Container (pi's chatContainer), for
- * widths under 5, and for containers without a DynamicBorder frame.
+ * widths under 5 + 2 * MARGIN_X, and for containers without a DynamicBorder frame.
  */
 function frameBounds(container: ContainerView, width: number): { topIdx: number; bottomIdx: number } | undefined {
-	if (container.constructor === Container || width < 5) return undefined;
+	if (container.constructor === Container || width < 5 + 2 * MARGIN_X) return undefined;
 	return findDynamicBorderBounds(container.children);
 }
 
@@ -331,8 +364,13 @@ function patchContainer(getTheme: () => Theme): () => void {
 			const sections = interior.map((child): FrameSection =>
 				child instanceof DynamicBorder ? { isDivider: true } : { isDivider: false, lines: child.render(innerWidth) },
 			);
-			const framed = frameContainerSections(sections, width, fgAnsi(getTheme(), "borderAccent"), visibleWidth, (text, w) =>
-				truncateToWidth(text, w, ""),
+			const framed = frameContainerSections(
+				sections,
+				width,
+				fgAnsi(getTheme(), "borderAccent"),
+				visibleWidth,
+				(text, w) => truncateToWidth(text, w, ""),
+				MARGIN_X,
 			);
 			lines.push(...framed.lines);
 			mouseChildren.push({ component: this.children[topIdx]!, height: 1 });
@@ -349,7 +387,8 @@ function patchContainer(getTheme: () => Theme): () => void {
 			const frame = this[FRAME_LAYOUT];
 			const layout = this.mouseLayout;
 			if (!frame || frame.width !== event.width || !layout) return original.handleMouse?.call(this, event);
-			if (event.type !== "wheel" && (event.x < 1 || event.x >= event.width - 1)) return undefined;
+			const borderInset = MARGIN_X + 1;
+			if (event.type !== "wheel" && (event.x < borderInset || event.x >= event.width - borderInset)) return undefined;
 			let childY = 0;
 			for (const [index, { component, height }] of layout.children.entries()) {
 				if (event.y < childY || event.y >= childY + height) {
@@ -380,17 +419,23 @@ function patchContainer(getTheme: () => Theme): () => void {
 
 /** Patches BashExecutionComponent.prototype.render (`!` and `!!` blocks). Returns the restore function. */
 function patchBashExecution(getTheme: () => Theme): () => void {
+	const chromeWidth = 2 + 2 * MARGIN_X;
 	return patchPrototype(BashExecutionComponent.prototype, (original) => ({
 		render(this: BashView, width: number): string[] {
 			const container = this.contentContainer;
-			if (width < 3 || typeof container?.render !== "function") return original.render.call(this, width);
-			const contentLines = container.render(width - 2);
+			if (width < 3 + 2 * MARGIN_X || typeof container?.render !== "function") {
+				return original.render.call(this, width);
+			}
+			const contentLines = container.render(width - chromeWidth);
 			const theme = getTheme();
 			const dim = fgAnsi(theme, "dim");
 			const borderFg = this.colorKey === "dim" ? dim : liftedBorderFg(theme, theme.colors.bashMode, dim);
-			return ["", ...frameLines(contentLines, width, borderFg, visibleWidth, (text, w) =>
-				truncateToWidth(text, w, ""),
-			)];
+			return [
+				"",
+				...frameLines(contentLines, width, borderFg, visibleWidth, (text, w) => truncateToWidth(text, w, ""), {
+					marginX: MARGIN_X,
+				}),
+			];
 		},
 	}));
 }

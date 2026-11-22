@@ -334,6 +334,22 @@ describe("frameLines custom borders", () => {
 		assert.equal(out[0], "TOP");
 		assert.equal(out[2], `${BORDER_FG}╰────╯${RESET}`);
 	});
+
+	it("adds symmetric outer horizontal margin while keeping total width and passing images through", () => {
+		const kitty = "\x1b_Gf=100,a=T;AAAA\x1b\\";
+		const top = formatTopBorder(6, BORDER_FG, `${BORDER_FG}U`, measure, truncate);
+		const out = frameLines(["abcd", kitty], 8, BORDER_FG, measure, truncate, { top, marginX: 1 });
+		assert.deepEqual(out, [
+			` ${top} `,
+			` ${BORDER_FG}│${RESET}abcd${RESET}${BORDER_FG}│${RESET} `,
+			kitty,
+			` ${BORDER_FG}╰────╯${RESET} `,
+		]);
+		assert.equal(measure(out[0]!), 8);
+		assert.equal(measure(out[1]!), 8);
+		assert.equal(measure(out[3]!), 8);
+		assert.deepEqual(frameLines(["hi"], 4, BORDER_FG, measure, truncate, { marginX: 1 }), ["hi"]);
+	});
 });
 
 describe("isBlankLine", () => {
@@ -429,5 +445,28 @@ describe("frameContainerSections", () => {
 		assert.deepEqual(out.lines, [top, kitty, iterm, row("ab"), bottom]);
 		assert.deepEqual(out.heights, [3]);
 		assert.equal(measure(out.lines[3]!), 6);
+	});
+
+	it("adds symmetric outer horizontal margin around borders and dividers", () => {
+		const kitty = "\x1b_Gf=100,a=T;AAAA\x1b\\";
+		const out = frameContainerSections(
+			[{ isDivider: false, lines: ["abcdef", kitty] }, { isDivider: true }, { isDivider: false, lines: ["x"] }],
+			8,
+			BORDER_FG,
+			measure,
+			truncate,
+			1,
+		);
+		assert.deepEqual(out.lines, [
+			` ${top} `,
+			` ${row("ab")} `,
+			kitty,
+			` ${divider} `,
+			` ${row("x ")} `,
+			` ${bottom} `,
+		]);
+		for (const line of out.lines) {
+			if (line !== kitty) assert.equal(measure(line), 8);
+		}
 	});
 });

@@ -62,10 +62,12 @@ export function isImageLine(line: string): boolean {
 }
 
 /**
- * Wraps `lines` in a rounded `╭─╮` / `│ │` / `╰─╯` frame exactly `width` columns wide, drawn in
- * `borderFg`. `custom.top` and `custom.bottom`, when given, replace the default top and bottom rows.
- * Returns `lines` unchanged when it is empty or `width < 3`. Content rows are fitted to the inner
- * width with `truncate` or padding, and image rows pass through untouched.
+ * Wraps `lines` in a rounded `╭─╮` / `│ │` / `╰─╯` frame `width` columns wide, drawn in `borderFg`.
+ * `custom.top` and `custom.bottom`, when given, replace the default top and bottom rows (sized to
+ * `width - 2 * marginX`). When `custom.marginX` is given, adds that many blank spaces on both sides
+ * outside the border. Returns `lines` unchanged when it is empty or the framed width is under 3.
+ * Content rows are fitted to the inner width with `truncate` or padding, and image rows pass through
+ * untouched.
  */
 export function frameLines(
 	lines: string[],
@@ -73,12 +75,15 @@ export function frameLines(
 	borderFg: string,
 	measure: (s: string) => number,
 	truncate: (s: string, w: number) => string,
-	custom?: { top?: string; bottom?: string },
+	custom?: { top?: string; bottom?: string; marginX?: number },
 ): string[] {
-	if (lines.length === 0 || width < 3) return lines;
-	const innerWidth = width - 2;
+	const marginX = Math.max(0, custom?.marginX ?? 0);
+	const frameWidth = width - marginX * 2;
+	if (lines.length === 0 || frameWidth < 3) return lines;
+	const innerWidth = frameWidth - 2;
 	const horizontal = "─".repeat(innerWidth);
-	const out = [custom?.top ?? `${borderFg}╭${horizontal}╮${RESET}`];
+	const margin = " ".repeat(marginX);
+	const out = [`${margin}${custom?.top ?? `${borderFg}╭${horizontal}╮${RESET}`}${margin}`];
 	for (const line of lines) {
 		if (isImageLine(line)) {
 			out.push(line);
@@ -87,9 +92,9 @@ export function frameLines(
 		const visible = measure(line);
 		const fitted =
 			visible > innerWidth ? truncate(line, innerWidth) : `${line}${" ".repeat(innerWidth - visible)}`;
-		out.push(`${borderFg}│${RESET}${fitted}${RESET}${borderFg}│${RESET}`);
+		out.push(`${margin}${borderFg}│${RESET}${fitted}${RESET}${borderFg}│${RESET}${margin}`);
 	}
-	out.push(custom?.bottom ?? `${borderFg}╰${horizontal}╯${RESET}`);
+	out.push(`${margin}${custom?.bottom ?? `${borderFg}╰${horizontal}╯${RESET}`}${margin}`);
 	return out;
 }
 
@@ -112,10 +117,11 @@ export type FrameSection = { isDivider: true } | { isDivider: false; lines: stri
 export type FramedSectionsResult = { lines: string[]; heights: number[]; trimmedTops: number[] };
 
 /**
- * Frames `sections` in a rounded border exactly `width` columns wide, drawn in `borderFg`. Divider sections
- * become full-width `├───┤` rows. Content rows get one space of padding on each side, are fitted to
- * `width - 4` columns, and image rows pass through untouched. Leading and trailing blank lines of the whole
- * interior are removed, stopping at dividers. Requires `width >= 5`.
+ * Frames `sections` in a rounded border `width` columns wide, drawn in `borderFg`, with `marginX` blank
+ * columns outside the border on both sides. Divider sections become `├───┤` rows. Content rows get one
+ * space of padding on each side, are fitted to `width - 2 * marginX - 4` columns, and image rows pass
+ * through untouched. Leading and trailing blank lines of the whole interior are removed, stopping at
+ * dividers. Requires `width >= 5 + 2 * marginX`.
  */
 export function frameContainerSections(
 	sections: readonly FrameSection[],
@@ -123,6 +129,7 @@ export function frameContainerSections(
 	borderFg: string,
 	measure: (s: string) => number,
 	truncate: (s: string, w: number) => string,
+	marginX = 0,
 ): FramedSectionsResult {
 	const contents: string[][] = sections.map((section) => (section.isDivider ? [] : [...section.lines]));
 	const trimmedTops = sections.map(() => 0);
@@ -140,13 +147,16 @@ export function frameContainerSections(
 		if (lines.length > 0) break;
 	}
 
-	const bar = "─".repeat(width - 2);
-	const innerWidth = width - 4;
-	const lines = [`${borderFg}╭${bar}╮${RESET}`];
+	const safeMarginX = Math.max(0, marginX);
+	const frameWidth = width - safeMarginX * 2;
+	const margin = " ".repeat(safeMarginX);
+	const bar = "─".repeat(frameWidth - 2);
+	const innerWidth = frameWidth - 4;
+	const lines = [`${margin}${borderFg}╭${bar}╮${RESET}${margin}`];
 	const heights: number[] = [];
 	sections.forEach((section, i) => {
 		if (section.isDivider) {
-			lines.push(`${borderFg}├${bar}┤${RESET}`);
+			lines.push(`${margin}${borderFg}├${bar}┤${RESET}${margin}`);
 			heights.push(1);
 			return;
 		}
@@ -159,10 +169,10 @@ export function frameContainerSections(
 			}
 			const visible = measure(line);
 			const fitted = visible > innerWidth ? truncate(line, innerWidth) : `${line}${" ".repeat(innerWidth - visible)}`;
-			lines.push(`${borderFg}│${RESET} ${fitted} ${RESET}${borderFg}│${RESET}`);
+			lines.push(`${margin}${borderFg}│${RESET} ${fitted} ${RESET}${borderFg}│${RESET}${margin}`);
 		}
 	});
-	lines.push(`${borderFg}╰${bar}╯${RESET}`);
+	lines.push(`${margin}${borderFg}╰${bar}╯${RESET}${margin}`);
 	return { lines, heights, trimmedTops };
 }
 
