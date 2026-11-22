@@ -56,3 +56,7 @@ rex.bind("ctrl+=", "client.font.increase")
 rex.bind("shift+ctrl+=", "client.font.increase")
 rex.bind("ctrl+-", "client.font.decrease")
 rex.bind("ctrl+0", "client.font.reset")
+
+-- Plugins
+require("rex-thumbs").setup{ key = false }
+rex.bind("ctrl+b>space", "thumbs")
