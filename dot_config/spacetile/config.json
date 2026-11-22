@@ -50,6 +50,7 @@
     "cmd-k" : "focus north",
     "cmd-l" : "focus east",
     "cmd-left" : "join west",
+    "cmd-n" : "split",
     "cmd-r" : "restore",
     "cmd-right" : "join east",
     "cmd-t" : "float",
