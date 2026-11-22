@@ -8,6 +8,7 @@
  * tests can pass a stub instead of pi-tui's `fuzzyFilter`.
  */
 
+import { basename } from "node:path";
 import { ARTIFACT_NAME_RE, ARTIFACT_TYPES, type ArtifactEntry, type ArtifactType } from "./store.ts";
 
 /**
@@ -52,15 +53,13 @@ export function parseArtifactArg(arg: string): { type: ArtifactType; name: strin
 	return { type, name };
 }
 
-/** Herdr label key prefix that the markdown viewer watches for show requests. */
-export const SHOW_LABEL_PREFIX = "markdown.show.";
-
 /**
- * Build the Herdr label `markdown.show.<id>=<path>` that asks the viewer to open
- * the artifact file at the absolute `path`. `id` is unique per request.
+ * Build the argv for `rex` that splits the pane `block` in Rex session `session`
+ * and runs `leaf open <path>` in a focused right pane (40% width). The new pane is
+ * labeled with the basename of `path`. Arguments are passed as-is, without a shell.
  */
-export function buildShowLabel(id: string, path: string): string {
-	return `${SHOW_LABEL_PREFIX}${id}=${path}`;
+export function buildRexShowArgs(session: string, block: string, path: string): string[] {
+	return ["split", "-s", session, "-b", block, "--split=right", "--ratio", "40", "--label", basename(path), "--", "leaf", "open", path];
 }
 
 /**

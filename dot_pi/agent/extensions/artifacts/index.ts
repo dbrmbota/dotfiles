@@ -19,7 +19,7 @@ import {
 	applyRefCompletion,
 	buildRefHint,
 	buildRefSuggestions,
-	buildShowLabel,
+	buildRexShowArgs,
 	buildStorePrompt,
 	completeArtifactArgs,
 	extractRefToken,
@@ -161,10 +161,15 @@ async function runArtifactCommand(
 		}
 		const picked = await pickArtifact(ctx, entries);
 		if (!picked) return;
-		const actions = ["Insert reference", ...(process.env.HC_TERMINAL_ID ? ["Show in Herdr"] : []), "Edit", "Delete"];
+		const actions = [
+			"Insert reference",
+			...(Boolean(process.env.REX_SESSION && process.env.REX_BLOCK) ? ["Show in Rex (leaf)"] : []),
+			"Edit",
+			"Delete",
+		];
 		const action = await ctx.ui.select(`${picked.type}:${picked.name}`, actions);
 		if (action === "Insert reference") ctx.ui.pasteToEditor(`@${picked.type}:${picked.name} `);
-		else if (action === "Show in Herdr") await showArtifact(pi, ctx, picked);
+		else if (action === "Show in Rex (leaf)") await showArtifact(pi, ctx, picked);
 		else if (action === "Edit") await editArtifact(ctx, picked);
 		else if (action === "Delete") await removeArtifact(ctx, picked);
 		return;
@@ -222,29 +227,28 @@ async function removeArtifact(ctx: ExtensionCommandContext, entry: ArtifactEntry
 }
 
 /**
- * Ask the Herdr terminal that runs pi to open `entry` in its markdown viewer. Sets a
- * unique `markdown.show.<id>` label on that terminal to the artifact's absolute path,
- * then returns without waiting. Nothing is reported back by the viewer. Notifies an
- * error outside a Herdr terminal, when `hc` exits nonzero, or when `hc` is missing.
+ * Launch `leaf open` for `entry` in a focused right side pane of the Rex session
+ * that runs pi, beside the caller's pane. Returns without waiting for leaf to exit.
+ * Notifies an error outside a Rex terminal, when `rex` exits nonzero, or when `rex`
+ * is missing.
  */
 async function showArtifact(pi: ExtensionAPI, ctx: ExtensionCommandContext, entry: ArtifactEntry): Promise<void> {
-	const terminalId = process.env.HC_TERMINAL_ID;
-	if (!terminalId) {
-		ctx.ui.notify("/artifact show needs a Herdr terminal", "error");
+	const session = process.env.REX_SESSION;
+	const block = process.env.REX_BLOCK;
+	if (!session || !block) {
+		ctx.ui.notify("/artifact show needs a Rex terminal", "error");
 		return;
 	}
-	const suffix = Array.from({ length: 4 }, () => Math.floor(Math.random() * 36).toString(36)).join("");
-	const id = `${Date.now().toString(36)}${suffix}`;
-	const result = await pi.exec("hc", ["label", terminalId, buildShowLabel(id, entry.path)], { timeout: 5000 }).catch(() => undefined);
+	const result = await pi.exec("rex", buildRexShowArgs(session, block, entry.path), { timeout: 5000 }).catch(() => undefined);
 	if (!result) {
-		ctx.ui.notify("hc not found", "error");
+		ctx.ui.notify("rex not found", "error");
 		return;
 	}
 	if (result.code !== 0) {
-		ctx.ui.notify(result.stderr.trim(), "error");
+		ctx.ui.notify(result.stderr.trim() || "rex split failed", "error");
 		return;
 	}
-	ctx.ui.notify(`Showing ${entry.type}:${entry.name} in Herdr`, "info");
+	ctx.ui.notify(`Showing ${entry.type}:${entry.name} in Rex`, "info");
 }
 
 /** Register the `input` handler, the commands, the autocomplete provider, and the lifecycle handlers. */

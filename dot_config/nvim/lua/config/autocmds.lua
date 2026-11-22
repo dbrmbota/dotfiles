@@ -7,24 +7,11 @@
 -- Or remove existing autocmds by their group name (which is prefixed with `lazyvim_` for the defaults)
 -- e.g. vim.api.nvim_del_augroup_by_name("lazyvim_wrap_spell")
 
--- Private. Encodes a non-negative integer in base 36 using [a-z0-9].
-local function to_base36(n)
-  if n == 0 then
-    return "0"
-  end
-  local digits = "0123456789abcdefghijklmnopqrstuvwxyz"
-  local out = {}
-  while n > 0 do
-    local d = n % 36
-    table.insert(out, 1, digits:sub(d + 1, d + 1))
-    n = math.floor(n / 36)
-  end
-  return table.concat(out)
-end
-
--- Private. Sends the buffer's file to the Herdr markdown viewer, or falls back to `:MarkdownPreviewToggle` when HC_TERMINAL_ID is unset.
-local function herdr_markdown_show(buf)
-  if vim.env.HC_TERMINAL_ID == nil or vim.env.HC_TERMINAL_ID == "" then
+-- Private. Opens the buffer's file in a focused Rex side pane running leaf, or falls back to `:MarkdownPreviewToggle` when REX_SESSION or REX_BLOCK is unset or empty.
+local function rex_markdown_show(buf)
+  local session = vim.env.REX_SESSION
+  local block = vim.env.REX_BLOCK
+  if session == nil or session == "" or block == nil or block == "" then
     vim.cmd("MarkdownPreviewToggle")
     return
   end
@@ -52,49 +39,48 @@ local function herdr_markdown_show(buf)
     return
   end
 
-  local id = to_base36(os.time()) .. to_base36(vim.uv.hrtime() % 36 ^ 4)
   local function on_exit(obj)
     vim.schedule(function()
       if obj.code ~= 0 then
         local stderr = vim.trim(obj.stderr or "")
-        vim.notify(stderr ~= "" and stderr or "hc label failed", vim.log.levels.ERROR)
+        vim.notify(stderr ~= "" and stderr or "rex split failed", vim.log.levels.ERROR)
         return
       end
-      vim.notify("Showing " .. vim.fn.fnamemodify(path, ":~:.") .. " in Herdr", vim.log.levels.INFO)
+      vim.notify("Showing " .. vim.fn.fnamemodify(path, ":~:.") .. " in Rex (leaf)", vim.log.levels.INFO)
     end)
   end
 
   local called = pcall(
     vim.system,
-    { "hc", "label", vim.env.HC_TERMINAL_ID, "markdown.show." .. id .. "=" .. path },
+    { "rex", "split", "-s", session, "-b", block, "--split=right", "--ratio", "40", "--label", vim.fn.fnamemodify(path, ":t"), "--", "leaf", "open", path },
     { text = true, timeout = 5000 },
     on_exit
   )
   if not called then
-    vim.notify("hc not found", vim.log.levels.ERROR)
+    vim.notify("rex not found", vim.log.levels.ERROR)
   end
 end
 
--- Private. Sets the buffer-local <leader>cp map that calls `herdr_markdown_show` for this buffer.
-local function herdr_markdown_map(buf)
+-- Private. Sets the buffer-local <leader>cp map that calls `rex_markdown_show` for this buffer.
+local function rex_markdown_map(buf)
   vim.keymap.set("n", "<leader>cp", function()
-    herdr_markdown_show(buf)
-  end, { buffer = buf, desc = "Markdown Preview (Herdr)" })
+    rex_markdown_show(buf)
+  end, { buffer = buf, desc = "Markdown Preview (Rex/leaf)" })
 end
 
 -- Markdown buffers <leader>cp map. Applies to the FileType autocmd below and to already-loaded markdown buffers.
-local herdr_markdown_group = vim.api.nvim_create_augroup("herdr_markdown_show", { clear = true })
+local rex_markdown_group = vim.api.nvim_create_augroup("rex_markdown_show", { clear = true })
 vim.api.nvim_create_autocmd("FileType", {
-  group = herdr_markdown_group,
+  group = rex_markdown_group,
   pattern = "markdown",
   callback = function(args)
-    herdr_markdown_map(args.buf)
+    rex_markdown_map(args.buf)
   end,
 })
 
 for _, buf in ipairs(vim.api.nvim_list_bufs()) do
   if vim.bo[buf].filetype == "markdown" then
-    herdr_markdown_map(buf)
+    rex_markdown_map(buf)
   end
 end
 
