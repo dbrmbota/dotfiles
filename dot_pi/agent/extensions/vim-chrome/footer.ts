@@ -101,7 +101,6 @@ export function createFooterFactory(ctx: ExtensionContext, getMeta: () => Footer
 		}
 
 		// ── middle: extension statuses ─────────────────────────
-		// The pi-sandbox chip is noise here. Filtered by status key, not text.
 		const hidden = new Set(options.hiddenStatuses);
 		const statuses = [...(footerData?.getExtensionStatuses().entries() ?? [])]
 			.filter(([key]) => !hidden.has(key))

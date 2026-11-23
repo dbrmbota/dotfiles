@@ -19,7 +19,7 @@ const OPTIONS = {
 			cache: "\udb80\udd9c",
 		},
 		contextThresholds: { warning: 70, error: 90 },
-		hiddenStatuses: ["sandbox"], // the pi-sandbox chip is noise
+		hiddenStatuses: [],
 	},
 	scrollIndicatorCaps: { capLeft: "\ue0b6", capRight: "\ue0b4" },
 };

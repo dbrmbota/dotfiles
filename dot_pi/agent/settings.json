@@ -13,7 +13,7 @@
       "source": "npm:pi-web-access",
       "extensions": []
     },
-    "npm:pi-sandbox",
+    "npm:@gotgenes/pi-permission-system",
     "npm:@normful/pi-auto-name",
     "npm:@baylarsadigov/omp-undo-redo",
     "npm:@qmahyar/pi-ask",
