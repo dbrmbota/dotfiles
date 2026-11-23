@@ -4,9 +4,11 @@ import {
 	type FrameSection,
 	extractBgSgr,
 	extractLeadingBgSgr,
+	findInlineDialogChild,
 	formatBottomBorder,
 	formatTopBorder,
 	frameContainerSections,
+	frameInlineDialog,
 	frameLines,
 	isBlankLine,
 	parseTruecolorBg,
@@ -468,5 +470,130 @@ describe("frameContainerSections", () => {
 		for (const line of out.lines) {
 			if (line !== kitty) assert.equal(measure(line), 8);
 		}
+	});
+});
+
+/** Test double that records each render width and returns fixed lines. */
+class RenderStub {
+	readonly widths: number[] = [];
+	readonly lines: string[];
+
+	constructor(lines: string[] = ["x"]) {
+		this.lines = lines;
+	}
+
+	render(width: number): string[] {
+		this.widths.push(width);
+		return this.lines;
+	}
+}
+
+class PermissionPromptComponent extends RenderStub {}
+class ModalEditor extends RenderStub {}
+class ExtensionSelectorComponent extends RenderStub {}
+
+/** Plain object literal whose constructor name is Object, rendering through `stub`. */
+const plainObject = (stub: RenderStub) => ({ render: (width: number) => stub.render(width) });
+
+/** Object with no prototype, rendering through `stub`. */
+const nullPrototype = (stub: RenderStub) =>
+	Object.assign(Object.create(null) as object, { render: (width: number) => stub.render(width) });
+
+/** A getBorderFg spy that counts its calls. */
+function borderFgSpy(): { getBorderFg: () => string; calls: () => number } {
+	let count = 0;
+	return {
+		getBorderFg: () => {
+			count++;
+			return BORDER_FG;
+		},
+		calls: () => count,
+	};
+}
+
+describe("findInlineDialogChild", () => {
+	it("returns the sole PermissionPromptComponent child", () => {
+		const prompt = new PermissionPromptComponent();
+		assert.equal(findInlineDialogChild([prompt]), prompt);
+	});
+
+	it("returns undefined for empty or multiple children, even when one is a PermissionPromptComponent", () => {
+		const prompt = new PermissionPromptComponent();
+		assert.equal(findInlineDialogChild([]), undefined);
+		assert.equal(findInlineDialogChild([prompt, new PermissionPromptComponent()]), undefined);
+		assert.equal(findInlineDialogChild([new ModalEditor(), prompt]), undefined);
+	});
+
+	it("returns undefined for a non-matching sole child", () => {
+		const children = [
+			new ModalEditor(),
+			new ExtensionSelectorComponent(),
+			plainObject(new RenderStub()),
+			nullPrototype(new RenderStub()),
+		];
+		for (const child of children) assert.equal(findInlineDialogChild([child]), undefined);
+	});
+});
+
+describe("frameInlineDialog", () => {
+	it("frames a sole PermissionPromptComponent at exact width with 1-column inner padding", () => {
+		const prompt = new PermissionPromptComponent(["ab"]);
+		const out = frameInlineDialog([prompt], 10, borderFgSpy().getBorderFg, measure, truncate, 1);
+		const top = ` ${BORDER_FG}╭${"─".repeat(6)}╮${RESET} `;
+		const row = ` ${BORDER_FG}│${RESET} ab   ${RESET}${BORDER_FG}│${RESET} `;
+		const bottom = ` ${BORDER_FG}╰${"─".repeat(6)}╯${RESET} `;
+		assert.deepEqual(out, { child: prompt, lines: [top, row, bottom] });
+		for (const line of out!.lines) assert.equal(measure(line), 10);
+		assert.deepEqual(prompt.widths, [4]);
+	});
+
+	it("returns undefined without rendering or reading the border colour for [] or multiple children", () => {
+		const prompt = new PermissionPromptComponent();
+		const other = new PermissionPromptComponent();
+		const spy = borderFgSpy();
+		assert.equal(frameInlineDialog([], 10, spy.getBorderFg, measure, truncate, 1), undefined);
+		assert.equal(frameInlineDialog([prompt, other], 10, spy.getBorderFg, measure, truncate, 1), undefined);
+		assert.deepEqual(prompt.widths, []);
+		assert.deepEqual(other.widths, []);
+		assert.equal(spy.calls(), 0);
+	});
+
+	it("returns undefined without rendering or reading the border colour for a non-matching sole child", () => {
+		const plain = new RenderStub();
+		const bare = new RenderStub();
+		const editor = new ModalEditor();
+		const selector = new ExtensionSelectorComponent();
+		const spy = borderFgSpy();
+		const children = [editor, selector, plainObject(plain), nullPrototype(bare)];
+		for (const child of children) {
+			assert.equal(frameInlineDialog([child], 10, spy.getBorderFg, measure, truncate, 1), undefined);
+		}
+		assert.deepEqual(editor.widths, []);
+		assert.deepEqual(selector.widths, []);
+		assert.deepEqual(plain.widths, []);
+		assert.deepEqual(bare.widths, []);
+		assert.equal(spy.calls(), 0);
+	});
+
+	it("returns undefined without rendering when width < 5 + 2 * marginX", () => {
+		const prompt = new PermissionPromptComponent(["ab"]);
+		assert.equal(frameInlineDialog([prompt], 6, borderFgSpy().getBorderFg, measure, truncate, 1), undefined);
+		assert.deepEqual(prompt.widths, []);
+	});
+
+	it("returns undefined when the child renders no lines", () => {
+		const prompt = new PermissionPromptComponent([]);
+		assert.equal(frameInlineDialog([prompt], 10, borderFgSpy().getBorderFg, measure, truncate, 1), undefined);
+	});
+
+	it("preserves cursor marker lines without stripping or widening them", () => {
+		const marker = "\x1b_pi:c\x07";
+		const prompt = new PermissionPromptComponent([marker]);
+		const out = frameInlineDialog([prompt], 14, borderFgSpy().getBorderFg, measure, truncate, 1);
+		const top = ` ${BORDER_FG}╭${"─".repeat(10)}╮${RESET} `;
+		const row = ` ${BORDER_FG}│${RESET} ${marker}  ${RESET}${BORDER_FG}│${RESET} `;
+		const bottom = ` ${BORDER_FG}╰${"─".repeat(10)}╯${RESET} `;
+		assert.deepEqual(out, { child: prompt, lines: [top, row, bottom] });
+		assert.deepEqual(prompt.widths, [8]);
 	});
 });

@@ -176,6 +176,54 @@ export function frameContainerSections(
 	return { lines, heights, trimmedTops };
 }
 
+/** Constructor names of inline dialogs that are framed when they are the sole child of a plain Container. */
+const FRAMED_INLINE_DIALOG_NAMES: ReadonlySet<string> = new Set([
+	// @gotgenes/pi-permission-system (src/authority/permission-prompt-component.ts)
+	"PermissionPromptComponent",
+]);
+
+/**
+ * The sole child of `children` when its constructor name is an allowlisted inline dialog, otherwise undefined.
+ * Undefined for empty or multi-child lists, for null-prototype objects, and for any other component.
+ */
+export function findInlineDialogChild<T>(children: readonly T[]): T | undefined {
+	const child = children.length === 1 ? children[0] : undefined;
+	if (typeof child !== "object" || child === null) return undefined;
+	const name = (child as { constructor?: { name?: string } }).constructor?.name;
+	return name !== undefined && FRAMED_INLINE_DIALOG_NAMES.has(name) ? child : undefined;
+}
+
+/**
+ * Frames the sole allowlisted inline dialog in `children` in a rounded `borderFg` frame, matching the other
+ * inline dialogs. The child renders `marginX` columns plus two inset columns narrower than `width` on each
+ * side. Returns the child and its framed rows, or undefined when the child is not allowlisted, when
+ * `width < 5 + 2 * marginX`, or when the child renders no rows.
+ */
+export function frameInlineDialog<T extends { render(width: number): string[] }>(
+	children: readonly T[],
+	width: number,
+	getBorderFg: () => string,
+	measure: (s: string) => number,
+	truncate: (s: string, w: number) => string,
+	marginX = 0,
+): { child: T; lines: string[] } | undefined {
+	const child = findInlineDialogChild(children);
+	if (!child) return undefined;
+	const safeMarginX = Math.max(0, marginX);
+	if (width < 5 + 2 * safeMarginX) return undefined;
+	const childLines = child.render(width - 2 * (safeMarginX + 2));
+	if (childLines.length === 0) return undefined;
+	const { lines } = frameContainerSections(
+		[{ isDivider: false, lines: childLines }],
+		width,
+		getBorderFg(),
+		measure,
+		truncate,
+		safeMarginX,
+	);
+	return { child, lines };
+}
+
 /** A status item on the editor's bottom border. Lower `priority` is dropped first on narrow widths. */
 export type BorderItem = { text: string; priority: number };
 

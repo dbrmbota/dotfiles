@@ -22,6 +22,7 @@ import {
 	extractBgSgr,
 	formatTopBorder,
 	frameContainerSections,
+	frameInlineDialog,
 	frameLines,
 	parseTruecolorBg,
 	wrapRoundedPill,
@@ -343,11 +344,29 @@ function frameBounds(container: ContainerView, width: number): { topIdx: number;
 
 /**
  * Patches Container.prototype.render and handleMouse so every Container subclass with a DynamicBorder frame is drawn
- * in a rounded border. Returns the restore function.
+ * in a rounded border. A plain Container whose sole child is an allowlisted inline dialog (see frameInlineDialog) is
+ * framed the same way. Returns the restore function.
  */
 function patchContainer(getTheme: () => Theme): () => void {
 	return patchPrototype(Container.prototype, (original) => ({
 		render(this: ContainerView, width: number): string[] {
+			if (this.constructor === Container) {
+				const framedDialog = frameInlineDialog(
+					this.children,
+					width,
+					() => fgAnsi(getTheme(), "borderAccent"),
+					visibleWidth,
+					(text, w) => truncateToWidth(text, w, ""),
+					MARGIN_X,
+				);
+				if (framedDialog) {
+					this.mouseLayout = {
+						width,
+						children: [{ component: framedDialog.child, height: framedDialog.lines.length }],
+					};
+					return framedDialog.lines;
+				}
+			}
 			const bounds = frameBounds(this, width);
 			if (!bounds) return original.render.call(this, width);
 			const { topIdx, bottomIdx } = bounds;
