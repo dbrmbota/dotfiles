@@ -34,7 +34,7 @@ const ORIGINAL = Symbol.for("vim-chrome.blocks.original");
 
 /** Methods saved from a prototype before patching. */
 type Originals = {
-	render(width: number): string[];
+	render(width: number): readonly string[];
 	handleMouse?(event: TuiMouseEvent): unknown;
 };
 
@@ -44,7 +44,7 @@ type Patchable = { [ORIGINAL]?: Originals };
 type BoxView = { bgFn?: (text: string) => string; paddingY: number };
 type TextView = { customBgFn?: (text: string) => string; paddingY: number };
 type MarkdownView = { defaultTextStyle?: { bgColor?: (text: string) => string }; paddingY: number };
-type BashView = { contentContainer?: { render?(width: number): string[] }; colorKey?: "bashMode" | "dim" };
+type BashView = { contentContainer?: { render?(width: number): readonly string[] }; colorKey?: "bashMode" | "dim" };
 
 /** Outer horizontal margin in columns on each side of framed blocks (keeps right border clear of the scrollbar). */
 const MARGIN_X = 1;
@@ -58,11 +58,19 @@ const FRAME_LAYOUT = Symbol.for("vim-chrome.blocks.frame-layout");
 /** Row layout of a framed Container: the frame's first and last child indexes and the trimmed rows per child. */
 type FrameLayout = { width: number; topIdx: number; bottomIdx: number; trimmedTops: number[] };
 
+/** Mirror of pi-tui's ChildLines, which pi-tui does not export: a Container's cached child layout. */
+type ChildLinesView = {
+	readonly width: number;
+	readonly children: readonly Component[];
+	readonly parts: readonly (readonly string[])[];
+	readonly lines: string[];
+};
+
 /** The Container fields that the framing patch reads and writes. */
 type ContainerView = {
 	children: readonly Component[];
-	render(width: number): string[];
-	mouseLayout?: { width: number; children: { component: Component; height: number }[] };
+	render(width: number): readonly string[];
+	childLines?: ChildLinesView;
 	[FRAME_LAYOUT]?: FrameLayout;
 };
 
@@ -181,13 +189,13 @@ function patchPrototype(proto: object, build: (original: Originals) => Originals
 function patchBox(getTheme: () => Theme): () => void {
 	const chromeWidth = 2 + 2 * MARGIN_X;
 	return patchPrototype(Box.prototype, (original) => ({
-		render(this: BoxView, width: number): string[] {
+		render(this: BoxView, width: number): readonly string[] {
 			const bg = extractBgSgr(this.bgFn);
 			if (!bg || width < 3 + 2 * MARGIN_X) return original.render.call(this, width);
 			const { bgFn, paddingY } = this;
 			this.bgFn = undefined;
 			this.paddingY = Math.max(0, paddingY - 1);
-			let lines: string[];
+			let lines: readonly string[];
 			try {
 				lines = original.render.call(this, width - chromeWidth);
 			} finally {
@@ -230,13 +238,13 @@ function patchBox(getTheme: () => Theme): () => void {
 function patchText(getTheme: () => Theme): () => void {
 	const chromeWidth = 2 + 2 * MARGIN_X;
 	return patchPrototype(Text.prototype, (original) => ({
-		render(this: TextView, width: number): string[] {
+		render(this: TextView, width: number): readonly string[] {
 			const bg = extractBgSgr(this.customBgFn);
 			if (!bg || width < 3 + 2 * MARGIN_X) return original.render.call(this, width);
 			const { customBgFn, paddingY } = this;
 			this.customBgFn = undefined;
 			this.paddingY = Math.max(0, paddingY - 1);
-			let lines: string[];
+			let lines: readonly string[];
 			try {
 				lines = original.render.call(this, width - chromeWidth);
 			} finally {
@@ -259,14 +267,14 @@ function patchText(getTheme: () => Theme): () => void {
 function patchMarkdown(getTheme: () => Theme): () => void {
 	const chromeWidth = 2 + 2 * MARGIN_X;
 	return patchPrototype(Markdown.prototype, (original) => ({
-		render(this: MarkdownView, width: number): string[] {
+		render(this: MarkdownView, width: number): readonly string[] {
 			const style = this.defaultTextStyle;
 			const bg = extractBgSgr(style?.bgColor);
 			if (!style || !bg || width < 3 + 2 * MARGIN_X) return original.render.call(this, width);
 			const { paddingY } = this;
 			this.defaultTextStyle = { ...style, bgColor: undefined };
 			this.paddingY = Math.max(0, paddingY - 1);
-			let lines: string[];
+			let lines: readonly string[];
 			try {
 				lines = original.render.call(this, width - chromeWidth);
 			} finally {
@@ -349,7 +357,7 @@ function frameBounds(container: ContainerView, width: number): { topIdx: number;
  */
 function patchContainer(getTheme: () => Theme): () => void {
 	return patchPrototype(Container.prototype, (original) => ({
-		render(this: ContainerView, width: number): string[] {
+		render(this: ContainerView, width: number): readonly string[] {
 			if (this.constructor === Container) {
 				const framedDialog = frameInlineDialog(
 					this.children,
@@ -360,9 +368,11 @@ function patchContainer(getTheme: () => Theme): () => void {
 					MARGIN_X,
 				);
 				if (framedDialog) {
-					this.mouseLayout = {
+					this.childLines = {
 						width,
-						children: [{ component: framedDialog.child, height: framedDialog.lines.length }],
+						children: [framedDialog.child],
+						parts: [framedDialog.lines],
+						lines: framedDialog.lines,
 					};
 					return framedDialog.lines;
 				}
@@ -372,11 +382,11 @@ function patchContainer(getTheme: () => Theme): () => void {
 			const { topIdx, bottomIdx } = bounds;
 			const innerWidth = width - 2 * INSET_X;
 			const lines: string[] = [];
-			const mouseChildren: { component: Component; height: number }[] = [];
+			const parts: (readonly string[])[] = [];
 			const renderUnframed = (child: Component) => {
 				const childLines = child.render(width);
 				lines.push(...childLines);
-				mouseChildren.push({ component: child, height: childLines.length });
+				parts.push(childLines);
 			};
 			this.children.slice(0, topIdx).forEach(renderUnframed);
 			const interior = this.children.slice(topIdx + 1, bottomIdx);
@@ -392,24 +402,32 @@ function patchContainer(getTheme: () => Theme): () => void {
 				MARGIN_X,
 			);
 			lines.push(...framed.lines);
-			mouseChildren.push({ component: this.children[topIdx]!, height: 1 });
-			interior.forEach((component, j) => mouseChildren.push({ component, height: framed.heights[j]! }));
-			mouseChildren.push({ component: this.children[bottomIdx]!, height: 1 });
+			parts.push(framed.lines.slice(0, 1));
+			let rowY = 1;
+			for (const height of framed.heights) {
+				parts.push(framed.lines.slice(rowY, rowY + height));
+				rowY += height;
+			}
+			parts.push(framed.lines.slice(rowY, rowY + 1));
 			this.children.slice(bottomIdx + 1).forEach(renderUnframed);
-			this.mouseLayout = { width, children: mouseChildren };
+			this.childLines = { width, children: [...this.children], parts, lines };
 			this[FRAME_LAYOUT] = { width, topIdx, bottomIdx, trimmedTops: framed.trimmedTops };
 			return lines;
 		},
 		handleMouse(this: ContainerView, event: TuiMouseEvent): unknown {
+			if (event.y < 0 || event.y >= event.height) return undefined;
 			if (!frameBounds(this, event.width)) return original.handleMouse?.call(this, event);
-			if (this.mouseLayout?.width !== event.width) this.render(event.width);
+			if (this.childLines?.width !== event.width || this[FRAME_LAYOUT]?.width !== event.width) {
+				this.render(event.width);
+			}
 			const frame = this[FRAME_LAYOUT];
-			const layout = this.mouseLayout;
+			const layout = this.childLines;
 			if (!frame || frame.width !== event.width || !layout) return original.handleMouse?.call(this, event);
 			const borderInset = MARGIN_X + 1;
 			if (event.type !== "wheel" && (event.x < borderInset || event.x >= event.width - borderInset)) return undefined;
 			let childY = 0;
-			for (const [index, { component, height }] of layout.children.entries()) {
+			for (const [index, component] of layout.children.entries()) {
+				const height = layout.parts[index]!.length;
 				if (event.y < childY || event.y >= childY + height) {
 					childY += height;
 					continue;
@@ -417,8 +435,13 @@ function patchContainer(getTheme: () => Theme): () => void {
 				if (index <= frame.topIdx || index >= frame.bottomIdx) return undefined;
 				const innerWidth = event.width - 2 * INSET_X;
 				const trimmedTop = frame.trimmedTops[index - frame.topIdx - 1] ?? 0;
-				const previous = this.mouseLayout;
-				this.mouseLayout = { width: innerWidth, children: [{ component, height: height + trimmedTop }] };
+				const previous = this.childLines;
+				this.childLines = {
+					width: innerWidth,
+					children: [component],
+					parts: [new Array<string>(height + trimmedTop)],
+					lines: [],
+				};
 				try {
 					return original.handleMouse?.call(this, {
 						...event,
@@ -428,7 +451,7 @@ function patchContainer(getTheme: () => Theme): () => void {
 						height: height + trimmedTop,
 					});
 				} finally {
-					this.mouseLayout = previous;
+					this.childLines = previous;
 				}
 			}
 			return undefined;
@@ -440,7 +463,7 @@ function patchContainer(getTheme: () => Theme): () => void {
 function patchBashExecution(getTheme: () => Theme): () => void {
 	const chromeWidth = 2 + 2 * MARGIN_X;
 	return patchPrototype(BashExecutionComponent.prototype, (original) => ({
-		render(this: BashView, width: number): string[] {
+		render(this: BashView, width: number): readonly string[] {
 			const container = this.contentContainer;
 			if (width < 3 + 2 * MARGIN_X || typeof container?.render !== "function") {
 				return original.render.call(this, width);

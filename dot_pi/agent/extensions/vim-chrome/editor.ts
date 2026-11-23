@@ -13,7 +13,7 @@ type MouseEvent = { x: number; y: number } & Record<string, unknown>;
 
 /** The surface of pi-vim's ModalEditor we touch. Privates exist at runtime. */
 export type VimEditorLike = {
-	render(width: number): string[];
+	render(width: number): readonly string[];
 	handleMouse?(event: MouseEvent): unknown;
 	getMode?(): string;
 	renderedVisibleLineCount?: number;
@@ -68,7 +68,7 @@ export function installEditorChrome(
 	// Layout of the last render, used to translate mouse rows back to the base editor.
 	let layout = { above: 0, content: 0, below: 0, autocomplete: 0 };
 
-	editor.render = function render(width: number): string[] {
+	editor.render = function render(width: number): readonly string[] {
 		if (width < 5) return originalRender.call(editor, width);
 		const innerWidth = Math.max(1, width - INSET_X * 2);
 		const lines = originalRender.call(editor, innerWidth);

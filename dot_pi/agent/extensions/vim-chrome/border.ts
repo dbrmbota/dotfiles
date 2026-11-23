@@ -70,7 +70,7 @@ export function isImageLine(line: string): boolean {
  * untouched.
  */
 export function frameLines(
-	lines: string[],
+	lines: readonly string[],
 	width: number,
 	borderFg: string,
 	measure: (s: string) => number,
@@ -79,7 +79,7 @@ export function frameLines(
 ): string[] {
 	const marginX = Math.max(0, custom?.marginX ?? 0);
 	const frameWidth = width - marginX * 2;
-	if (lines.length === 0 || frameWidth < 3) return lines;
+	if (lines.length === 0 || frameWidth < 3) return [...lines];
 	const innerWidth = frameWidth - 2;
 	const horizontal = "─".repeat(innerWidth);
 	const margin = " ".repeat(marginX);
@@ -108,7 +108,7 @@ export function isBlankLine(line: string): boolean {
 }
 
 /** One block of a framed container: a full-width divider row, or the content lines of one child. */
-export type FrameSection = { isDivider: true } | { isDivider: false; lines: string[] };
+export type FrameSection = { isDivider: true } | { isDivider: false; lines: readonly string[] };
 
 /**
  * Result of framing sections. `lines` are the framed rows. `heights[i]` and `trimmedTops[i]` describe section `i`:
@@ -199,7 +199,7 @@ export function findInlineDialogChild<T>(children: readonly T[]): T | undefined 
  * side. Returns the child and its framed rows, or undefined when the child is not allowlisted, when
  * `width < 5 + 2 * marginX`, or when the child renders no rows.
  */
-export function frameInlineDialog<T extends { render(width: number): string[] }>(
+export function frameInlineDialog<T extends { render(width: number): readonly string[] }>(
 	children: readonly T[],
 	width: number,
 	getBorderFg: () => string,

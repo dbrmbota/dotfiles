@@ -113,6 +113,33 @@ describe("frameLines", () => {
 		const out = frameLines([kitty, iterm], 10, BORDER_FG, measure, truncate);
 		assert.deepEqual(out.slice(1, 3), [kitty, iterm]);
 	});
+
+	it("accepts frozen readonly input without throwing", () => {
+		const lines: readonly string[] = Object.freeze(["ab"]);
+		const out = frameLines(lines, 6, BORDER_FG, measure, truncate);
+		assert.equal(out.length, 3);
+		for (const line of out) assert.equal(measure(line), 6);
+	});
+
+	it("returns a fresh mutable copy, not the input reference, on the empty early return", () => {
+		const input: readonly string[] = Object.freeze([]);
+		const out = frameLines(input, 10, BORDER_FG, measure, truncate);
+		assert.deepEqual(out, []);
+		assert.notEqual(out, input);
+		assert.equal(Object.isFrozen(out), false);
+		out.push("x");
+		assert.deepEqual(out, ["x"]);
+	});
+
+	it("returns a fresh mutable copy, not the input reference, on the narrow early return", () => {
+		const input: readonly string[] = Object.freeze(["hi"]);
+		const out = frameLines(input, 2, BORDER_FG, measure, truncate);
+		assert.deepEqual(out, ["hi"]);
+		assert.notEqual(out, input);
+		assert.equal(Object.isFrozen(out), false);
+		out.push("x");
+		assert.deepEqual(out, ["hi", "x"]);
+	});
 });
 
 describe("modePendingFromLabel", () => {
