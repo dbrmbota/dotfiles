@@ -1,6 +1,28 @@
 {
   "$schema": "https://raw.githubusercontent.com/gotgenes/pi-packages/main/packages/pi-permission-system/schemas/permissions.schema.json",
-  "authorizerChain": ["floor-deny"],
+  "authorizerChain": [
+    "floor-deny"
+  ],
+  "commandEffects": {
+    "git": {
+      "unlessOption": [
+        "--output"
+      ],
+      "subcommands": {
+        "log": "read",
+        "diff": "read"
+      }
+    },
+    "chezmoi": {
+      "subcommands": {
+        "diff": "read",
+        "status": "read"
+      }
+    },
+    "jq": {
+      "effects": "read"
+    }
+  },
   "permission": {
     "*": "allow",
     "path": {
@@ -83,24 +105,10 @@
       "~/.agents/skills": "allow",
       "~/.agents/skills/*": "allow",
       "~/.config/herdr-app/AGENTS.md": "allow",
-      "~/.pi/agent/agents": "allow",
-      "~/.pi/agent/agents/*": "allow",
-      "~/.pi/agent/prompts": "allow",
-      "~/.pi/agent/prompts/*": "allow",
-      "~/.pi/agent/skills": "allow",
-      "~/.pi/agent/skills/*": "allow",
-      "~/.pi/agent/themes": "allow",
-      "~/.pi/agent/themes/*": "allow",
-      "~/.pi/agent/extensions": "allow",
-      "~/.pi/agent/extensions/*": "allow",
+      "~/.pi": "allow",
+      "~/.pi/*": "allow",
       "~/.pi/agent/extensions/pi-permission-system/logs": "ask",
       "~/.pi/agent/extensions/pi-permission-system/logs/*": "ask",
-      "~/.pi/agent/npm": "allow",
-      "~/.pi/agent/npm/*": "allow",
-      "~/.pi/agent/git": "allow",
-      "~/.pi/agent/git/*": "allow",
-      "~/.pi/agent/settings.json": "allow",
-      "~/.pi/agent/AGENTS.md": "allow",
       "/opt/homebrew/*": "allow",
       "/home/linuxbrew/.linuxbrew/*": "allow"
     },
@@ -110,7 +118,10 @@
       "git -C * config *": "deny",
       "git push *": "ask",
       "git -C * push *": "ask",
-      "git credential*": { "action": "deny", "reason": "Never print credentials." },
+      "git credential*": {
+        "action": "deny",
+        "reason": "Never print credentials."
+      },
       "rm -r *": "ask",
       "rm -R *": "ask",
       "rm -rf *": "ask",
@@ -150,7 +161,10 @@
       "gh api *-f*": "ask",
       "gh api *-F*": "ask",
       "gh api *--input*": "ask",
-      "gh auth token*": { "action": "deny", "reason": "Never print credentials." },
+      "gh auth token*": {
+        "action": "deny",
+        "reason": "Never print credentials."
+      },
       "chezmoi *": "ask",
       "chezmoi diff *": "allow",
       "chezmoi status *": "allow",
@@ -159,12 +173,21 @@
       "chezmoi target-path *": "allow",
       "chezmoi verify *": "allow",
       "chezmoi doctor *": "allow",
-      "chezmoi cat *": { "action": "deny", "reason": "Never render secret templates." },
-      "chezmoi execute-template *": { "action": "deny", "reason": "Never render secret templates." },
+      "chezmoi cat *": {
+        "action": "deny",
+        "reason": "Never render secret templates."
+      },
+      "chezmoi execute-template *": {
+        "action": "deny",
+        "reason": "Never render secret templates."
+      },
       "pi *": "ask",
       "pi --version": "allow",
       "pi list": "allow",
-      "pi auth *": { "action": "deny", "reason": "Never print credentials." },
+      "pi auth *": {
+        "action": "deny",
+        "reason": "Never print credentials."
+      },
       "aws *": "ask",
       "az *": "ask",
       "scw *": "ask",
@@ -176,10 +199,19 @@
       "scp *": "ask",
       "sftp *": "ask",
       "rsync *:*": "ask",
-      "aws secretsmanager get-secret-value *": { "action": "deny", "reason": "Never print credentials." },
+      "aws secretsmanager get-secret-value *": {
+        "action": "deny",
+        "reason": "Never print credentials."
+      },
       "security *": "ask",
-      "security find-*-password *": { "action": "deny", "reason": "Never print credentials." },
-      "security dump-keychain *": { "action": "deny", "reason": "Never print credentials." },
+      "security find-*-password *": {
+        "action": "deny",
+        "reason": "Never print credentials."
+      },
+      "security dump-keychain *": {
+        "action": "deny",
+        "reason": "Never print credentials."
+      },
       "rex run *": "ask",
       "rex send *": "ask",
       "rex send-key *": "ask",
