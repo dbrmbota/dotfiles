@@ -21,12 +21,14 @@
   "blocks": [
     {
       "alignment": "left",
+      "newline": true,
       "segments": [
         {
           "background": "p:blue",
           "foreground": "p:black",
           "style": "diamond",
-          "trailing_diamond": "\ue0b0",
+          "leading_diamond": "\ue0b6",
+          "trailing_diamond": "\ue0b4",
           "template": " {{ if .WSL }}WSL at {{ end }}{{ .Icon }} ",
           "type": "os"
         },
@@ -34,7 +36,7 @@
           "background": "p:fg_gutter",
           "foreground": "p:blue",
           "style": "diamond",
-          "trailing_diamond": "\ue0b0",
+          "trailing_diamond": "\ue0b4",
           "template": " {{ .Path }} ",
           "type": "path",
           "options": {

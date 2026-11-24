@@ -103,9 +103,10 @@
       "/private/var/folders/*": "allow"
     },
     "external_directory_read": {
+      "~/.config": "allow",
+      "~/.config/*": "allow",
       "~/.agents/skills": "allow",
       "~/.agents/skills/*": "allow",
-      "~/.config/herdr-app/AGENTS.md": "allow",
       "~/.zshrc": "allow",
       "~/.pi": "allow",
       "~/.pi/*": "allow",
