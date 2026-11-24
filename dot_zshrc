@@ -100,9 +100,8 @@ bindkey '^[[3~' delete-char          # Delete
 bindkey '^[[1;5D' backward-word      # Ctrl+Left
 bindkey '^[[1;5C' forward-word       # Ctrl+Right
 
-# HS-RS GRC project
-export TELERIK_NUGET_KEY="{{ (awsSecretsManager "hsrs/telerik-nuget-key").key }}"
-
-# Context7 (pi @upstash/context7-pi extension)
-export CONTEXT7_API_KEY="{{ (awsSecretsManager "upstash/context7-api-key").key }}"
+# --- Secrets -----------------------------------------------------------------
+if [[ -f "$HOME/.zshrc.secrets" && -r "$HOME/.zshrc.secrets" ]]; then
+  source "$HOME/.zshrc.secrets"
+fi
 

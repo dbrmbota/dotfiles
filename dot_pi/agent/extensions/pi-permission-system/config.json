@@ -64,7 +64,7 @@
       "~/.config/opencode/opencode.json": "deny",
       "~/.config/opencode/opencode.jsonc": "deny",
       "~/.config/pi/web-search.json": "deny",
-      "~/.zshrc": "deny",
+      "~/.zshrc.secrets": "deny",
       "~/.zsh_history": "deny",
       "~/.zsh_sessions": "deny",
       "~/.zsh_sessions/*": "deny",
@@ -74,6 +74,7 @@
       "*.env.example": "allow"
     },
     "path_write": {
+      "~/.zshrc": "deny",
       "~/.pi/agent/settings.json": "deny",
       "~/.pi/agent/trust.json": "deny",
       "~/.pi/agent/extensions": "deny",
@@ -105,6 +106,7 @@
       "~/.agents/skills": "allow",
       "~/.agents/skills/*": "allow",
       "~/.config/herdr-app/AGENTS.md": "allow",
+      "~/.zshrc": "allow",
       "~/.pi": "allow",
       "~/.pi/*": "allow",
       "~/.pi/agent/extensions/pi-permission-system/logs": "ask",
@@ -166,6 +168,7 @@
         "reason": "Never print credentials."
       },
       "chezmoi *": "ask",
+      "chezmoi --version": "allow",
       "chezmoi diff *": "allow",
       "chezmoi status *": "allow",
       "chezmoi managed *": "allow",
