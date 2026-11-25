@@ -1,33 +1,82 @@
 {
+  "openaiSearchProviders": [
+    "openrouter"
+  ],
+  "openaiResponsesUrl": "https://openrouter.ai/api/v1/responses",
+  "openaiSearchModel": "openai/gpt-6-luna",
+  "summaryModel": "openrouter/deepseek/deepseek-v4.1-flash-1017:low",
+  "queryRewriteModel": "openrouter/deepseek/deepseek-v4.1-flash-1017",
   "searchRouting": {
-    "providers": ["openai", "exa"],
-    "fallbackOn": ["unsupported", "transient", "quota", "network", "invalid-response"]
+    "providers": [
+      "openai",
+      "exa"
+    ],
+    "fallbackOn": [
+      "unsupported",
+      "transient",
+      "quota",
+      "network",
+      "invalid-response"
+    ]
   },
   "webSearch": {
-    "allowedProviders": ["openai", "exa"]
+    "allowedProviders": [
+      "openai",
+      "exa"
+    ]
   },
   "workflow": "none",
   "maxInlineContentChars": 20000,
   "fetch": {
+    "answerProvider": "openrouter",
+    "answerModel": "deepseek/deepseek-v4.1-flash-1017",
     "timeout": 30,
     "defaultMode": "readable",
-    "allowedModes": ["readable", "raw", "answer"]
+    "allowedModes": [
+      "readable",
+      "raw",
+      "answer"
+    ]
   },
-  "youtube": { "enabled": false },
-  "video": { "enabled": false },
-  "image": { "enabled": true },
-  "pdf": { "enabled": true },
+  "youtube": {
+    "enabled": false
+  },
+  "video": {
+    "enabled": false
+  },
+  "image": {
+    "enabled": true
+  },
+  "pdf": {
+    "enabled": true
+  },
   "tools": {
-    "webSearch": { "enabled": true },
-    "fetchContent": { "enabled": true },
-    "getSearchContent": { "enabled": true },
-    "sourceCheck": { "enabled": false }
+    "webSearch": {
+      "enabled": true
+    },
+    "fetchContent": {
+      "enabled": true
+    },
+    "getSearchContent": {
+      "enabled": true
+    },
+    "sourceCheck": {
+      "enabled": false
+    }
   },
   "commands": {
-    "websearch": { "enabled": true },
-    "search": { "enabled": false },
-    "curator": { "enabled": false },
-    "google-account": { "enabled": false }
+    "websearch": {
+      "enabled": true
+    },
+    "search": {
+      "enabled": false
+    },
+    "curator": {
+      "enabled": false
+    },
+    "google-account": {
+      "enabled": false
+    }
   },
   "allowBrowserCookies": false
 }
