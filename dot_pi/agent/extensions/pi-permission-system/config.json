@@ -16,7 +16,8 @@
     "chezmoi": {
       "subcommands": {
         "diff": "read",
-        "status": "read"
+        "status": "read",
+        "managed": "read"
       }
     },
     "jq": {
