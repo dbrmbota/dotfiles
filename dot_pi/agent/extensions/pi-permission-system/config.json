@@ -105,6 +105,8 @@
     "external_directory_read": {
       "~/.config": "allow",
       "~/.config/*": "allow",
+      "~/.local/share/nvim": "allow",
+      "~/.local/share/nvim/*": "allow",
       "~/.agents/skills": "allow",
       "~/.agents/skills/*": "allow",
       "~/.zshrc": "allow",
