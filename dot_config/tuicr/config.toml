@@ -1,4 +1,4 @@
-theme = "tokyo-night-storm"
+theme = "tokyo-night-storm-flat"
 diff_view = "side-by-side"
 comment_vim = true
 
