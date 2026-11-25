@@ -16,12 +16,13 @@
     "npm:@gotgenes/pi-permission-system",
     "npm:@normful/pi-auto-name",
     "npm:@baylarsadigov/omp-undo-redo",
-    "npm:@qmahyar/pi-ask",
+    "npm:@mrclrchtr/supi-ask-user",
     {
       "source": "npm:@upstash/context7-pi",
       "skills": [],
       "prompts": []
-    }
+    },
+    "./extensions/agents"
   ],
   "piVim": {
     "clipboardMirror": "yank"

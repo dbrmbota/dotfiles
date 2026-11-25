@@ -23,6 +23,10 @@
  * model reads from an advertised skill are granted for the rest of the
  * session. The grants are recorded as `agent-grants` entries on the branch.
  *
+ * Keep `./extensions/agents` last in `settings.json` `packages`, after tool-registering
+ * packages such as `npm:@mrclrchtr/supi-ask-user`. Those packages can register tools in
+ * `session_start`, and this extension must run after them so its tool checks see them.
+ *
  * This file is wiring only. The controller (`controller.ts`) holds the state
  * and behavior, and the pure modules hold the parsing and matching logic.
  */

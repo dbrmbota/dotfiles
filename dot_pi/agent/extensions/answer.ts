@@ -7,8 +7,8 @@
 // question per open question, with enough background in each prompt to answer
 // it without scrolling back.
 //
-// The form itself comes from the ask_user tool (@qmahyar/pi-ask), so text
-// answers use the host editor (pi-vim). This extension adds no UI of its own.
+// The form itself comes from the ask_user tool (@mrclrchtr/supi-ask-user), so
+// text answers use the host editor (pi-vim). This extension adds no UI of its own.
 //
 // Usage:
 //   /answer                     re-ask the open questions from the last reply
@@ -60,7 +60,7 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 			if (!pi.getActiveTools().includes(ASK_TOOL)) {
-				ctx.ui.notify(`/answer: the ${ASK_TOOL} tool is not active (install @qmahyar/pi-ask)`, "error");
+				ctx.ui.notify(`/answer: the ${ASK_TOOL} tool is not active (install @mrclrchtr/supi-ask-user)`, "error");
 				return;
 			}
 			if (!lastAssistantText(ctx)) {
