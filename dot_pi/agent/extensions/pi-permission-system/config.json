@@ -225,7 +225,8 @@
       "rex do *": "ask",
       "rex api call *": "ask",
       "herdr-app do *": "ask",
-      "osascript *": "ask"
+      "osascript *": "ask",
+      "printenv *": "deny"
     }
   }
 }
