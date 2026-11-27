@@ -29,6 +29,13 @@ fi
 # --- fnm setup ---------------------------------------------------------------
 eval "$(fnm env --use-on-cd --shell zsh)"
 
+# --- pnpm setup --------------------------------------------------------------
+export PNPM_HOME='/Users/dbrmbota/Library/pnpm'
+case ":$PATH:" in
+  ":$PNPM_HOME/bin:"*) ;;
+  *) export PATH="$PNPM_HOME/bin:$PATH" ;;
+esac
+
 # --- Oh My Posh setup --------------------------------------------------------
 eval "$(oh-my-posh init zsh --config $XDG_CONFIG_HOME/ohmyposh/theme.json)"
 
