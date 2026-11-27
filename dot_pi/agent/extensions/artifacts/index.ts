@@ -163,7 +163,7 @@ async function runArtifactCommand(
 		if (!picked) return;
 		const actions = [
 			"Insert reference",
-			...(Boolean(process.env.REX_SESSION && process.env.REX_BLOCK) ? ["Show in Rex (leaf)"] : []),
+			...(process.env.REX_BLOCK ? ["Show in Rex (leaf)"] : []),
 			"Edit",
 			"Delete",
 		];
@@ -227,19 +227,18 @@ async function removeArtifact(ctx: ExtensionCommandContext, entry: ArtifactEntry
 }
 
 /**
- * Launch `leaf open` for `entry` in a focused right side pane of the Rex session
- * that runs pi, beside the caller's pane. Returns without waiting for leaf to exit.
+ * Launch `leaf open` for `entry` in a focused right side pane beside the caller's
+ * pane. The Rex session is implied by REX_BLOCK, the pane that runs pi. Returns without waiting for leaf to exit.
  * Notifies an error outside a Rex terminal, when `rex` exits nonzero, or when `rex`
  * is missing.
  */
 async function showArtifact(pi: ExtensionAPI, ctx: ExtensionCommandContext, entry: ArtifactEntry): Promise<void> {
-	const session = process.env.REX_SESSION;
 	const block = process.env.REX_BLOCK;
-	if (!session || !block) {
+	if (!block) {
 		ctx.ui.notify("/artifact show needs a Rex terminal", "error");
 		return;
 	}
-	const result = await pi.exec("rex", buildRexShowArgs(session, block, entry.path), { timeout: 5000 }).catch(() => undefined);
+	const result = await pi.exec("rex", buildRexShowArgs(block, entry.path), { timeout: 5000 }).catch(() => undefined);
 	if (!result) {
 		ctx.ui.notify("rex not found", "error");
 		return;

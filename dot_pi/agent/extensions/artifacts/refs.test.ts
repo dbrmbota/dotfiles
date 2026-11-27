@@ -230,10 +230,8 @@ describe("applyRefCompletion", () => {
 
 describe("buildRexShowArgs", () => {
 	it("builds the full rex split argv for leaf open in a right pane", () => {
-		assert.deepEqual(buildRexShowArgs("s1", "b1", "/x/y.md"), [
+		assert.deepEqual(buildRexShowArgs("b1", "/x/y.md"), [
 			"split",
-			"-s",
-			"s1",
 			"-b",
 			"b1",
 			"--split=right",
@@ -249,16 +247,16 @@ describe("buildRexShowArgs", () => {
 	});
 
 	it("labels the pane with the basename of a nested path", () => {
-		const args = buildRexShowArgs("s1", "b1", "/a/b/c/report.md");
+		const args = buildRexShowArgs("b1", "/a/b/c/report.md");
 		assert.equal(args[args.indexOf("--label") + 1], "report.md");
 	});
 
 	it("keeps a path with spaces and nested directories as one argument", () => {
 		const path = "/Users/me/my notes/nested dir/plan doc.md";
-		const args = buildRexShowArgs("s1", "b1", path);
+		const args = buildRexShowArgs("b1", path);
 		assert.equal(args[args.length - 1], path);
 		assert.equal(args[args.indexOf("--label") + 1], "plan doc.md");
-		assert.equal(args.length, 14);
+		assert.equal(args.length, 12);
 	});
 });
 

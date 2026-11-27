@@ -54,12 +54,13 @@ export function parseArtifactArg(arg: string): { type: ArtifactType; name: strin
 }
 
 /**
- * Build the argv for `rex` that splits the pane `block` in Rex session `session`
- * and runs `leaf open <path>` in a focused right pane (40% width). The new pane is
- * labeled with the basename of `path`. Arguments are passed as-is, without a shell.
+ * Build the argv for `rex` that splits the pane `block` and runs `leaf open <path>`
+ * in a focused right pane (40% width). The session is implied by `block`, so no
+ * `-s` is passed. The new pane is labeled with the basename of `path`. Arguments
+ * are passed as-is, without a shell.
  */
-export function buildRexShowArgs(session: string, block: string, path: string): string[] {
-	return ["split", "-s", session, "-b", block, "--split=right", "--ratio", "40", "--label", basename(path), "--", "leaf", "open", path];
+export function buildRexShowArgs(block: string, path: string): string[] {
+	return ["split", "-b", block, "--split=right", "--ratio", "40", "--label", basename(path), "--", "leaf", "open", path];
 }
 
 /**

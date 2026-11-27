@@ -7,11 +7,10 @@
 -- Or remove existing autocmds by their group name (which is prefixed with `lazyvim_` for the defaults)
 -- e.g. vim.api.nvim_del_augroup_by_name("lazyvim_wrap_spell")
 
--- Private. Opens the buffer's file in a focused Rex side pane running leaf, or falls back to `:MarkdownPreviewToggle` when REX_SESSION or REX_BLOCK is unset or empty.
+-- Private. Opens the buffer's file in a focused Rex side pane running leaf, or falls back to `:MarkdownPreviewToggle` when REX_BLOCK is unset or empty. The Rex session is implied by the block.
 local function rex_markdown_show(buf)
-  local session = vim.env.REX_SESSION
   local block = vim.env.REX_BLOCK
-  if session == nil or session == "" or block == nil or block == "" then
+  if block == nil or block == "" then
     vim.cmd("MarkdownPreviewToggle")
     return
   end
@@ -52,7 +51,7 @@ local function rex_markdown_show(buf)
 
   local called = pcall(
     vim.system,
-    { "rex", "split", "-s", session, "-b", block, "--split=right", "--ratio", "40", "--label", vim.fn.fnamemodify(path, ":t"), "--", "leaf", "open", path },
+    { "rex", "split", "-b", block, "--split=right", "--ratio", "40", "--label", vim.fn.fnamemodify(path, ":t"), "--", "leaf", "open", path },
     { text = true, timeout = 5000 },
     on_exit
   )
