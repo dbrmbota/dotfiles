@@ -46,6 +46,7 @@ rex.bind("ctrl+b>q", "client.window.close")
 rex.bind("cmd+c", "pane.copy")
 rex.bind("cmd+v", "pane.paste")
 rex.bind("alt+backspace", "pane.send_key", { key = "ctrl+w" })
+rex.bind("ctrl+b>shift+c", "pane.copy_mode.enter")
 
 -- Font size (ctrl instead of cmd)
 rex.unbind("cmd+=", "client.font.increase")
@@ -58,5 +59,5 @@ rex.bind("ctrl+-", "client.font.decrease")
 rex.bind("ctrl+0", "client.font.reset")
 
 -- Plugins
-require("rex-thumbs").setup{ key = false }
+require("rex-thumbs").setup({ key = false })
 rex.bind("ctrl+b>space", "thumbs")
