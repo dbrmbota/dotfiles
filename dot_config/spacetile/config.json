@@ -23,6 +23,10 @@
     {
       "app" : "Finder",
       "title" : "Co(py|nnect)|Move|Info|Pref"
+    },
+    {
+      "app" : "Firefox",
+      "title" : "Extension: \\(Bitwarden Password Manager\\)"
     }
   ],
   "focusFollowsMouse" : false,
