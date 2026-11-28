@@ -59,7 +59,6 @@
     "cmd-right" : "join east",
     "cmd-t" : "float",
     "cmd-up" : "join north",
-    "cmd-x" : "mirror vertical",
     "cmd-y" : "mirror horizontal",
     "shift-cmd-0" : "send 10",
     "shift-cmd-1" : "send 1",

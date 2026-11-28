@@ -31,7 +31,7 @@
   "extensionChangelogVersions": {
     "{\"source\":\"npm:@normful/pi-auto-name\",\"scope\":\"user\"}": "2.1.0",
     "{\"source\":\"npm:@baylarsadigov/omp-undo-redo\",\"scope\":\"user\"}": "1.8.1",
-    "{\"source\":\"npm:@gotgenes/pi-permission-system\",\"scope\":\"user\"}": "44.0.2",
+    "{\"source\":\"npm:@gotgenes/pi-permission-system\",\"scope\":\"user\"}": "45.0.0",
     "{\"source\":\"npm:@mrclrchtr/supi-ask-user\",\"scope\":\"user\"}": "16.0.0"
   }
 }
